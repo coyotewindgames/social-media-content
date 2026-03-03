@@ -4,6 +4,8 @@ import { ContentIdea, CaptionTone, Platform } from '@/lib/types'
 import { ContentCard } from '@/components/ContentCard'
 import { ContentDialog } from '@/components/ContentDialog'
 import { EmptyState } from '@/components/EmptyState'
+import { AccountsDialog } from '@/components/AccountsDialog'
+import { PublishDialog } from '@/components/PublishDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -15,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle } from '@phosphor-icons/react'
+import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User } from '@phosphor-icons/react'
 import { Calendar } from '@/components/ui/calendar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, Toaster } from 'sonner'
@@ -24,6 +26,9 @@ function App() {
   const [contents, setContents] = useKV<ContentIdea[]>('content-ideas', [])
   const [selectedContent, setSelectedContent] = useState<ContentIdea | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [accountsDialogOpen, setAccountsDialogOpen] = useState(false)
+  const [publishDialogOpen, setPublishDialogOpen] = useState(false)
+  const [contentToPublish, setContentToPublish] = useState<ContentIdea | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
   const [view, setView] = useState<'list' | 'calendar'>('list')
@@ -61,6 +66,26 @@ function App() {
   const handleDelete = (id: string) => {
     setContents((currentContents) => (currentContents || []).filter((c) => c.id !== id))
     toast.success('Content deleted')
+  }
+
+  const handlePublish = (content: ContentIdea) => {
+    setContentToPublish(content)
+    setPublishDialogOpen(true)
+  }
+
+  const handlePublished = (contentId: string, postUrl: string) => {
+    setContents((currentContents) =>
+      (currentContents || []).map((c) =>
+        c.id === contentId
+          ? {
+              ...c,
+              status: 'published' as const,
+              publishedUrl: postUrl,
+              publishedAt: new Date().toISOString(),
+            }
+          : c
+      )
+    )
   }
 
   const handleGenerateCaption = async (
@@ -137,14 +162,24 @@ Requirements:
                 Plan, organize, and create amazing social content with AI
               </p>
             </div>
-            <Button
-              onClick={handleCreateNew}
-              size="lg"
-              className="bg-gradient-to-r from-accent to-primary text-white hover:opacity-90 transition-opacity"
-            >
-              <Plus size={20} weight="bold" className="mr-2" />
-              New Content
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setAccountsDialogOpen(true)}
+                variant="outline"
+                size="lg"
+              >
+                <User size={20} weight="duotone" className="mr-2" />
+                Accounts
+              </Button>
+              <Button
+                onClick={handleCreateNew}
+                size="lg"
+                className="bg-gradient-to-r from-accent to-primary text-white hover:opacity-90 transition-opacity"
+              >
+                <Plus size={20} weight="bold" className="mr-2" />
+                New Content
+              </Button>
+            </div>
           </div>
 
           <div className="flex flex-col md:flex-row gap-3">
@@ -214,6 +249,7 @@ Requirements:
                       content={content}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      onPublish={handlePublish}
                     />
                   ))}
                 </AnimatePresence>
@@ -270,6 +306,7 @@ Requirements:
                         content={content}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
+                        onPublish={handlePublish}
                       />
                     ))}
                   </div>
@@ -289,6 +326,18 @@ Requirements:
         }}
         onSave={handleSave}
         onGenerateCaption={handleGenerateCaption}
+      />
+
+      <AccountsDialog open={accountsDialogOpen} onClose={() => setAccountsDialogOpen(false)} />
+
+      <PublishDialog
+        content={contentToPublish}
+        open={publishDialogOpen}
+        onClose={() => {
+          setPublishDialogOpen(false)
+          setContentToPublish(null)
+        }}
+        onPublished={handlePublished}
       />
     </div>
   )

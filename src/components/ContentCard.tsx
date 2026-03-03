@@ -2,7 +2,7 @@ import { ContentIdea, Platform } from '@/lib/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { PencilSimple, Trash, Copy } from '@phosphor-icons/react'
+import { PencilSimple, Trash, Copy, PaperPlaneTilt } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
@@ -10,6 +10,7 @@ interface ContentCardProps {
   content: ContentIdea
   onEdit: (content: ContentIdea) => void
   onDelete: (id: string) => void
+  onPublish?: (content: ContentIdea) => void
 }
 
 const platformColors: Record<Platform, string> = {
@@ -20,10 +21,18 @@ const platformColors: Record<Platform, string> = {
   youtube: 'bg-red-600 text-white',
 }
 
-export function ContentCard({ content, onEdit, onDelete }: ContentCardProps) {
+export function ContentCard({ content, onEdit, onDelete, onPublish }: ContentCardProps) {
   const handleCopyCaption = () => {
     navigator.clipboard.writeText(content.caption)
     toast.success('Caption copied to clipboard!')
+  }
+
+  const statusColors = {
+    draft: 'bg-gray-500',
+    scheduled: 'bg-blue-500',
+    published: 'bg-green-500',
+    failed: 'bg-red-500',
+    idea: 'bg-yellow-500',
   }
 
   return (
@@ -39,11 +48,30 @@ export function ContentCard({ content, onEdit, onDelete }: ContentCardProps) {
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-lg truncate mb-1">{content.title}</h3>
-              <Badge className={`${platformColors[content.platform]} text-xs`}>
-                {content.platform}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge className={`${platformColors[content.platform]} text-xs`}>
+                  {content.platform}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  <div className={`w-2 h-2 rounded-full ${statusColors[content.status]} mr-1`} />
+                  {content.status}
+                </Badge>
+              </div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onPublish && content.status !== 'published' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-accent"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onPublish(content)
+                  }}
+                >
+                  <PaperPlaneTilt size={16} weight="fill" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
@@ -93,6 +121,11 @@ export function ContentCard({ content, onEdit, onDelete }: ContentCardProps) {
           {content.scheduledDate && (
             <p className="text-xs text-muted-foreground mt-3">
               📅 {new Date(content.scheduledDate).toLocaleDateString()}
+            </p>
+          )}
+          {content.publishedUrl && (
+            <p className="text-xs text-green-600 mt-2 flex items-center">
+              ✓ Published
             </p>
           )}
         </CardContent>
