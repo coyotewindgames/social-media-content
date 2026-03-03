@@ -9,76 +9,189 @@ export interface PostData {
 
 export interface PlatformConfig {
   clientId: string
+  clientSecret: string
   redirectUri: string
   scopes: string[]
+  authUrl: string
+  tokenUrl: string
+  userInfoUrl: string
 }
 
 const PLATFORM_CONFIGS: Record<Platform, PlatformConfig> = {
   instagram: {
-    clientId: import.meta.env.VITE_INSTAGRAM_CLIENT_ID || '',
+    clientId: import.meta.env.VITE_INSTAGRAM_CLIENT_ID || 'demo_instagram_client',
+    clientSecret: import.meta.env.VITE_INSTAGRAM_CLIENT_SECRET || '',
     redirectUri: `${window.location.origin}/auth/callback`,
-    scopes: ['instagram_basic', 'instagram_content_publish'],
+    scopes: ['instagram_basic', 'instagram_content_publish', 'pages_read_engagement'],
+    authUrl: 'https://api.instagram.com/oauth/authorize',
+    tokenUrl: 'https://api.instagram.com/oauth/access_token',
+    userInfoUrl: 'https://graph.instagram.com/me',
   },
   facebook: {
-    clientId: import.meta.env.VITE_FACEBOOK_CLIENT_ID || '',
+    clientId: import.meta.env.VITE_FACEBOOK_CLIENT_ID || 'demo_facebook_client',
+    clientSecret: import.meta.env.VITE_FACEBOOK_CLIENT_SECRET || '',
     redirectUri: `${window.location.origin}/auth/callback`,
-    scopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list'],
+    scopes: ['pages_manage_posts', 'pages_read_engagement', 'pages_show_list', 'public_profile'],
+    authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
+    tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
+    userInfoUrl: 'https://graph.facebook.com/me',
   },
   twitter: {
-    clientId: import.meta.env.VITE_TWITTER_CLIENT_ID || '',
+    clientId: import.meta.env.VITE_TWITTER_CLIENT_ID || 'demo_twitter_client',
+    clientSecret: import.meta.env.VITE_TWITTER_CLIENT_SECRET || '',
     redirectUri: `${window.location.origin}/auth/callback`,
-    scopes: ['tweet.read', 'tweet.write', 'users.read'],
+    scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+    authUrl: 'https://twitter.com/i/oauth2/authorize',
+    tokenUrl: 'https://api.twitter.com/2/oauth2/token',
+    userInfoUrl: 'https://api.twitter.com/2/users/me',
   },
   tiktok: {
-    clientId: import.meta.env.VITE_TIKTOK_CLIENT_ID || '',
+    clientId: import.meta.env.VITE_TIKTOK_CLIENT_ID || 'demo_tiktok_client',
+    clientSecret: import.meta.env.VITE_TIKTOK_CLIENT_SECRET || '',
     redirectUri: `${window.location.origin}/auth/callback`,
-    scopes: ['video.publish', 'user.info.basic'],
+    scopes: ['video.publish', 'user.info.basic', 'user.info.profile'],
+    authUrl: 'https://www.tiktok.com/v2/auth/authorize',
+    tokenUrl: 'https://open.tiktokapis.com/v2/oauth/token',
+    userInfoUrl: 'https://open.tiktokapis.com/v2/user/info',
   },
   youtube: {
-    clientId: import.meta.env.VITE_YOUTUBE_CLIENT_ID || '',
+    clientId: import.meta.env.VITE_YOUTUBE_CLIENT_ID || 'demo_youtube_client',
+    clientSecret: import.meta.env.VITE_YOUTUBE_CLIENT_SECRET || '',
     redirectUri: `${window.location.origin}/auth/callback`,
-    scopes: ['https://www.googleapis.com/auth/youtube.upload'],
+    scopes: [
+      'https://www.googleapis.com/auth/youtube.upload',
+      'https://www.googleapis.com/auth/youtube',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ],
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    userInfoUrl: 'https://www.googleapis.com/youtube/v3/channels',
   },
 }
 
+function generateCodeVerifier(): string {
+  const array = new Uint8Array(32)
+  crypto.getRandomValues(array)
+  return Array.from(array, (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const data = encoder.encode(verifier)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(hash)))
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+}
+
+function generateState(): string {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+}
+
 export class SocialMediaAPI {
-  static getAuthUrl(platform: Platform): string {
+  static async initiateOAuth(platform: Platform): Promise<void> {
     const config = PLATFORM_CONFIGS[platform]
+    const state = generateState()
+    const codeVerifier = generateCodeVerifier()
+    
+    await window.spark.kv.set(`oauth_state_${state}`, { platform, codeVerifier, timestamp: Date.now() })
+    
+    let authUrl = ''
     
     switch (platform) {
       case 'instagram':
-      case 'facebook':
-        return `https://www.facebook.com/v18.0/dialog/oauth?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&scope=${config.scopes.join(',')}&response_type=code&state=${platform}`
+      case 'facebook': {
+        const params = new URLSearchParams({
+          client_id: config.clientId,
+          redirect_uri: config.redirectUri,
+          scope: config.scopes.join(','),
+          response_type: 'code',
+          state: state,
+        })
+        authUrl = `${config.authUrl}?${params.toString()}`
+        break
+      }
       
-      case 'twitter':
-        return `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&scope=${config.scopes.join(' ')}&state=${platform}&code_challenge=challenge&code_challenge_method=plain`
+      case 'twitter': {
+        const codeChallenge = await generateCodeChallenge(codeVerifier)
+        const params = new URLSearchParams({
+          response_type: 'code',
+          client_id: config.clientId,
+          redirect_uri: config.redirectUri,
+          scope: config.scopes.join(' '),
+          state: state,
+          code_challenge: codeChallenge,
+          code_challenge_method: 'S256',
+        })
+        authUrl = `${config.authUrl}?${params.toString()}`
+        break
+      }
       
-      case 'tiktok':
-        return `https://www.tiktok.com/v2/auth/authorize?client_key=${config.clientId}&scope=${config.scopes.join(',')}&response_type=code&redirect_uri=${encodeURIComponent(config.redirectUri)}&state=${platform}`
+      case 'tiktok': {
+        const params = new URLSearchParams({
+          client_key: config.clientId,
+          scope: config.scopes.join(','),
+          response_type: 'code',
+          redirect_uri: config.redirectUri,
+          state: state,
+        })
+        authUrl = `${config.authUrl}?${params.toString()}`
+        break
+      }
       
-      case 'youtube':
-        return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${config.clientId}&redirect_uri=${encodeURIComponent(config.redirectUri)}&response_type=code&scope=${encodeURIComponent(config.scopes.join(' '))}&access_type=offline&state=${platform}`
+      case 'youtube': {
+        const params = new URLSearchParams({
+          client_id: config.clientId,
+          redirect_uri: config.redirectUri,
+          response_type: 'code',
+          scope: config.scopes.join(' '),
+          access_type: 'offline',
+          prompt: 'consent',
+          state: state,
+        })
+        authUrl = `${config.authUrl}?${params.toString()}`
+        break
+      }
       
       default:
         throw new Error(`Unsupported platform: ${platform}`)
+    }
+    
+    window.open(authUrl, '_blank', 'width=600,height=700')
+  }
+
+  static async handleCallback(code: string, state: string): Promise<{
+    platform: Platform
+    accessToken: string
+    refreshToken?: string
+    expiresIn?: number
+  }> {
+    const stateData = await window.spark.kv.get<{ platform: Platform; codeVerifier: string; timestamp: number }>(`oauth_state_${state}`)
+    
+    if (!stateData) {
+      throw new Error('Invalid OAuth state')
+    }
+    
+    await window.spark.kv.delete(`oauth_state_${state}`)
+    
+    if (Date.now() - stateData.timestamp > 600000) {
+      throw new Error('OAuth state expired')
+    }
+    
+    const tokenData = await this.exchangeCodeForToken(stateData.platform, code, stateData.codeVerifier)
+    
+    return {
+      platform: stateData.platform,
+      ...tokenData,
     }
   }
 
   static async exchangeCodeForToken(
     platform: Platform,
-    code: string
+    code: string,
+    codeVerifier?: string
   ): Promise<{ accessToken: string; refreshToken?: string; expiresIn?: number }> {
-    const prompt = window.spark.llmPrompt`You are simulating an OAuth token exchange response for ${platform}. 
-Given the authorization code: ${code}
-
-Return a JSON object with the following structure:
-{
-  "accessToken": "mock_access_token_${Date.now()}",
-  "refreshToken": "mock_refresh_token_${Date.now()}",
-  "expiresIn": 3600
-}
-
-Return ONLY valid JSON, no other text.`
+    const timestamp = Date.now()
+    const prompt = window.spark.llmPrompt`Generate a mock OAuth token response for ${platform}. Return a JSON object with these fields: accessToken (string starting with "mock_${platform}_"), refreshToken (string starting with "refresh_${platform}_"), expiresIn (number 3600). Make the tokens look realistic with random alphanumeric characters. Return ONLY valid JSON.`
 
     const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
@@ -89,15 +202,9 @@ Return ONLY valid JSON, no other text.`
     displayName: string
     profileImageUrl?: string
   }> {
-    const prompt = window.spark.llmPrompt`You are simulating a social media API response for ${platform}.
-Generate a realistic user profile with the following structure:
-{
-  "username": "user_${Date.now()}",
-  "displayName": "Creative User",
-  "profileImageUrl": "https://api.dicebear.com/7.x/avataaars/svg?seed=${Date.now()}"
-}
-
-Return ONLY valid JSON, no other text.`
+    const timestamp = Date.now()
+    const seed = Math.floor(Math.random() * 10000)
+    const prompt = window.spark.llmPrompt`Generate a realistic mock user profile for ${platform}. Return a JSON object with: username (string, lowercase, no spaces, like "${platform}user${seed}"), displayName (string, a real-sounding name), profileImageUrl (string, use "https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}"). Return ONLY valid JSON.`
 
     const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
@@ -109,20 +216,7 @@ Return ONLY valid JSON, no other text.`
     postData: PostData
   ): Promise<PostingResult> {
     try {
-      const prompt = window.spark.llmPrompt`You are simulating a social media posting API response for ${platform}.
-The content being posted:
-Caption: ${postData.caption}
-Has Image: ${!!postData.imageUrl}
-Has Video: ${!!postData.videoUrl}
-
-Simulate a successful post and return JSON with:
-{
-  "success": true,
-  "postUrl": "https://${platform}.com/${account.username}/post/${Date.now()}",
-  "platformPostId": "post_${Date.now()}"
-}
-
-Return ONLY valid JSON, no other text.`
+      const prompt = window.spark.llmPrompt`You are simulating a social media posting API response for ${platform}. The content being posted - Caption: ${postData.caption}, Has Image: ${!!postData.imageUrl}, Has Video: ${!!postData.videoUrl}. Simulate a successful post and return JSON with: success (true), postUrl (string like "https://${platform}.com/${account.username}/post/${Date.now()}"), platformPostId (string like "post_${Date.now()}"). Return ONLY valid JSON.`
 
       const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
       const result = JSON.parse(response)
@@ -147,19 +241,7 @@ Return ONLY valid JSON, no other text.`
     scheduledTime: Date
   ): Promise<PostingResult> {
     try {
-      const prompt = window.spark.llmPrompt`You are simulating a social media scheduling API response for ${platform}.
-The content being scheduled:
-Caption: ${postData.caption}
-Scheduled Time: ${scheduledTime.toISOString()}
-
-Simulate a successful schedule and return JSON with:
-{
-  "success": true,
-  "postUrl": "https://${platform}.com/${account.username}/scheduled/${Date.now()}",
-  "platformPostId": "scheduled_${Date.now()}"
-}
-
-Return ONLY valid JSON, no other text.`
+      const prompt = window.spark.llmPrompt`You are simulating a social media scheduling API response for ${platform}. The content being scheduled - Caption: ${postData.caption}, Scheduled Time: ${scheduledTime.toISOString()}. Simulate a successful schedule and return JSON with: success (true), postUrl (string like "https://${platform}.com/${account.username}/scheduled/${Date.now()}"), platformPostId (string like "scheduled_${Date.now()}"). Return ONLY valid JSON.`
 
       const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
       const result = JSON.parse(response)
@@ -181,14 +263,7 @@ Return ONLY valid JSON, no other text.`
     platform: Platform,
     refreshToken: string
   ): Promise<{ accessToken: string; expiresIn: number }> {
-    const prompt = window.spark.llmPrompt`Simulate an OAuth token refresh for ${platform}.
-Return JSON with:
-{
-  "accessToken": "refreshed_token_${Date.now()}",
-  "expiresIn": 3600
-}
-
-Return ONLY valid JSON, no other text.`
+    const prompt = window.spark.llmPrompt`Simulate an OAuth token refresh for ${platform}. Return JSON with: accessToken (string like "refreshed_token_${Date.now()}"), expiresIn (number 3600). Return ONLY valid JSON.`
 
     const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
@@ -205,17 +280,7 @@ Return ONLY valid JSON, no other text.`
     views: number
     reach: number
   }> {
-    const prompt = window.spark.llmPrompt`Simulate analytics data for a ${platform} post with ID: ${postId}.
-Generate realistic engagement metrics and return JSON with:
-{
-  "likes": (random number between 10-1000),
-  "comments": (random number between 0-100),
-  "shares": (random number between 0-50),
-  "views": (random number between 100-10000),
-  "reach": (random number between 200-15000)
-}
-
-Return ONLY valid JSON, no other text.`
+    const prompt = window.spark.llmPrompt`Simulate analytics data for a ${platform} post with ID: ${postId}. Generate realistic engagement metrics and return JSON with: likes (random 10-1000), comments (random 0-100), shares (random 0-50), views (random 100-10000), reach (random 200-15000). Return ONLY valid JSON.`
 
     const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)

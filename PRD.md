@@ -1,14 +1,14 @@
 # Planning Guide
 
-A personal social media content planner that helps creators brainstorm, organize, and preview content ideas with AI-assisted caption generation - all stored locally in the browser.
+A comprehensive social media content planner with OAuth integration for Instagram, TikTok, Facebook, Twitter, and YouTube. Features AI-assisted caption generation, content scheduling, account management, and automated posting capabilities.
 
 **Experience Qualities**: 
-1. **Creative** - Encourages experimentation with different content ideas and caption styles through AI-powered suggestions
-2. **Organized** - Provides clear visual structure for planning content across different themes and timeframes
-3. **Inspiring** - Sparks creativity through AI brainstorming assistance and visual content planning
+1. **Professional** - Enterprise-grade OAuth integration with secure account management across multiple platforms
+2. **Organized** - Clear visual structure for managing content across different social media accounts and schedules
+3. **Automated** - Streamlined workflow from content creation to multi-platform publishing
 
-**Complexity Level**: Light Application (multiple features with basic state)
-This is a content planning tool focused on ideation and organization rather than complex automation or API integrations. It helps users think through their content strategy.
+**Complexity Level**: Complex Application (advanced functionality with multiple integrations)
+This is a full-featured social media automation platform with OAuth authentication, multi-account management, API integrations with 5 major platforms, and automated content publishing capabilities.
 
 ## Essential Features
 

@@ -53,22 +53,31 @@ export function AccountsDialog({ open, onClose }: AccountsDialogProps) {
     setConnecting(platform)
     
     try {
-      const authUrl = SocialMediaAPI.getAuthUrl(platform)
-      const authCode = `auth_code_${Date.now()}_${platform}`
+      await SocialMediaAPI.initiateOAuth(platform)
+      toast.success(`Opening ${SocialMediaAPI.getPlatformName(platform)} authorization...`)
       
-      const tokenData = await SocialMediaAPI.exchangeCodeForToken(platform, authCode)
-      const profile = await SocialMediaAPI.getUserProfile(platform, tokenData.accessToken)
+      setTimeout(() => setConnecting(null), 3000)
+    } catch (error) {
+      toast.error(`Failed to initiate ${platform} OAuth`)
+      setConnecting(null)
+    }
+  }
+  
+  const handleOAuthComplete = async (code: string, state: string) => {
+    try {
+      const result = await SocialMediaAPI.handleCallback(code, state)
+      const profile = await SocialMediaAPI.getUserProfile(result.platform, result.accessToken)
       
       const newAccount: SocialAccount = {
         id: `account_${Date.now()}`,
-        platform,
+        platform: result.platform,
         username: profile.username,
         displayName: profile.displayName,
         profileImageUrl: profile.profileImageUrl,
-        accessToken: tokenData.accessToken,
-        refreshToken: tokenData.refreshToken,
-        tokenExpiresAt: tokenData.expiresIn
-          ? new Date(Date.now() + tokenData.expiresIn * 1000).toISOString()
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        tokenExpiresAt: result.expiresIn
+          ? new Date(Date.now() + result.expiresIn * 1000).toISOString()
           : undefined,
         status: 'connected',
         lastSyncedAt: new Date().toISOString(),
@@ -76,11 +85,9 @@ export function AccountsDialog({ open, onClose }: AccountsDialogProps) {
       }
       
       setAccounts((current) => [...(current || []), newAccount])
-      toast.success(`${SocialMediaAPI.getPlatformName(platform)} account connected!`)
+      toast.success(`${SocialMediaAPI.getPlatformName(result.platform)} account connected!`)
     } catch (error) {
-      toast.error(`Failed to connect ${platform} account`)
-    } finally {
-      setConnecting(null)
+      toast.error(`Failed to complete OAuth: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -136,7 +143,7 @@ export function AccountsDialog({ open, onClose }: AccountsDialogProps) {
             Social Media Accounts
           </DialogTitle>
           <DialogDescription>
-            Connect your social media accounts to automate posting
+            Connect your social media accounts to automate posting. See OAUTH_SETUP.md for detailed setup instructions.
           </DialogDescription>
         </DialogHeader>
 
