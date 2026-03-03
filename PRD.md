@@ -12,6 +12,13 @@ This is a full-featured social media automation platform with OAuth authenticati
 
 ## Essential Features
 
+### Trending Topics Discovery (NEW)
+- **Functionality**: Automatically discover trending topics and generate content ideas from them
+- **Purpose**: Helps creators stay relevant by creating content around what's currently trending
+- **Trigger**: User clicks "Discover Trends" button in the header
+- **Progression**: Select timeframe (today/this week) → Discover trends → Review trending topics with categories and relevance → Select topics → Choose platform and tone → Generate content ideas automatically
+- **Success criteria**: Displays 8 diverse trending topics across categories, allows multi-select, and generates complete content ideas with titles, descriptions, and captions
+
 ### AI Caption Generator
 - **Functionality**: Generate creative captions based on content description and tone
 - **Purpose**: Helps creators overcome writer's block and explore different caption styles
