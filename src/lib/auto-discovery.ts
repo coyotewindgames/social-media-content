@@ -21,6 +21,7 @@ export interface AutoDiscoverySettings {
   maxTopicsPerRun: number
   categories: string[]
   grokApiKey?: string
+  ollamaEndpoint?: string
 }
 
 export const DEFAULT_AUTO_DISCOVERY_SETTINGS: AutoDiscoverySettings = {
@@ -32,6 +33,7 @@ export const DEFAULT_AUTO_DISCOVERY_SETTINGS: AutoDiscoverySettings = {
   defaultTone: 'casual',
   maxTopicsPerRun: 5,
   categories: ['Technology', 'Entertainment', 'Lifestyle', 'Health', 'Business', 'Culture'],
+  ollamaEndpoint: 'http://localhost:11434',
 }
 
 export async function fetchTrendingTopics(

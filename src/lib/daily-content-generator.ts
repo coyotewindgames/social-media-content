@@ -1,5 +1,7 @@
 import { ContentIdea, Platform, CaptionTone } from './types'
-import { fetchTrendingTopics, generateContentFromTopic } from './auto-discovery'
+import { fetchTrendingNews, TrendingTopic } from './news-api'
+import { generateCaptionWithOllama } from './ollama-api'
+import { generateImageWithGrok } from './grok-image-generation'
 
 export interface DailyContentGenerationOptions {
   count?: number
@@ -7,6 +9,7 @@ export interface DailyContentGenerationOptions {
   tone?: CaptionTone
   generateImages?: boolean
   grokApiKey?: string
+  ollamaEndpoint?: string
 }
 
 export async function generateDailyContent(
@@ -17,44 +20,87 @@ export async function generateDailyContent(
     platform = 'instagram',
     tone = 'casual',
     generateImages = true,
-    grokApiKey
+    grokApiKey,
+    ollamaEndpoint = 'http://localhost:11434'
   } = options
 
-  const topics = await fetchTrendingTopics('today', count * 2)
+  const trendingTopics = await fetchTrendingNews()
   
-  const selectedTopics = topics
-    .filter(topic => topic.suggestedPlatforms.includes(platform))
-    .slice(0, count)
+  const selectedTopics = trendingTopics.slice(0, count)
 
-  if (selectedTopics.length < count) {
-    const remaining = count - selectedTopics.length
-    const additionalTopics = topics
-      .filter(topic => !selectedTopics.includes(topic))
-      .slice(0, remaining)
-    selectedTopics.push(...additionalTopics)
-  }
-
-  const contentPromises = selectedTopics.slice(0, count).map(async (topic) => {
-    const contentBase = await generateContentFromTopic(
+  const contentPromises = selectedTopics.map(async (topic) => {
+    const content = await generateContentFromNews(
       topic,
       platform,
       tone,
       generateImages,
-      grokApiKey
+      grokApiKey,
+      ollamaEndpoint
     )
-
-    const content: ContentIdea = {
-      ...contentBase,
-      id: `daily-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
 
     return content
   })
 
   const contents = await Promise.all(contentPromises)
   return contents
+}
+
+async function generateContentFromNews(
+  newsItem: TrendingTopic,
+  platform: Platform,
+  tone: CaptionTone,
+  generateImages: boolean,
+  grokApiKey?: string,
+  ollamaEndpoint?: string
+): Promise<ContentIdea> {
+  const article = newsItem.articles[0]
+  const title = newsItem.topic
+  const description = newsItem.suggestedContentAngle || article?.description || newsItem.relevance
+
+  const caption = await generateCaptionWithOllama(
+    {
+      topic: title,
+      description: description,
+      tone,
+      platform,
+      maxLength: platform === 'twitter' ? 280 : 2200,
+      includeHashtags: true,
+      includeEmojis: tone === 'playful' || tone === 'casual',
+    },
+    ollamaEndpoint
+  )
+
+  let generatedImageUrl: string | undefined
+  let imagePrompt: string | undefined
+
+  if (generateImages && grokApiKey) {
+    try {
+      const imageResult = await generateImageWithGrok(title, description.substring(0, 200), platform, grokApiKey)
+      if (imageResult.success) {
+        generatedImageUrl = imageResult.imageUrl || imageResult.imageDataUrl
+        imagePrompt = imageResult.prompt
+      }
+    } catch (error) {
+      console.error('Failed to generate image for daily content:', error)
+    }
+  }
+
+  const content: ContentIdea = {
+    id: `daily-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    title,
+    description,
+    caption,
+    platform,
+    status: 'idea',
+    notes: `Auto-generated from trending news: ${article?.source || 'News Source'}\nCategory: ${newsItem.category}\n\n${article?.title || ''}`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    generatedImageUrl,
+    imagePrompt,
+    generatedByAutoDiscovery: true,
+  }
+
+  return content
 }
 
 export function getDailyContentCacheKey(): string {
@@ -97,26 +143,21 @@ export async function regenerateDailyContent(
     platform = 'instagram',
     tone = 'casual',
     generateImages = true,
-    grokApiKey
+    grokApiKey,
+    ollamaEndpoint = 'http://localhost:11434'
   } = options
 
-  const topics = await fetchTrendingTopics('today', 10)
-  const randomTopic = topics[Math.floor(Math.random() * topics.length)]
+  const trendingTopics = await fetchTrendingNews()
+  const randomTopic = trendingTopics[Math.floor(Math.random() * trendingTopics.length)]
 
-  const contentBase = await generateContentFromTopic(
+  const content = await generateContentFromNews(
     randomTopic,
     platform,
     tone,
     generateImages,
-    grokApiKey
+    grokApiKey,
+    ollamaEndpoint
   )
-
-  const content: ContentIdea = {
-    ...contentBase,
-    id: `daily-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  }
 
   const cached = await getCachedDailyContent()
   if (cached) {

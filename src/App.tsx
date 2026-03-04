@@ -66,7 +66,8 @@ function App() {
           platform: 'instagram',
           tone: 'casual',
           generateImages: true,
-          grokApiKey: autoDiscoverySettings.grokApiKey
+          grokApiKey: autoDiscoverySettings.grokApiKey,
+          ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint
         })
         setDailyContents(daily)
         if (!fromCache) {
@@ -194,7 +195,8 @@ function App() {
           platform: 'instagram',
           tone: 'casual',
           generateImages: true,
-          grokApiKey: autoDiscoverySettings.grokApiKey
+          grokApiKey: autoDiscoverySettings.grokApiKey,
+          ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint
         })
         
         const updated = [...dailyContents]
@@ -219,7 +221,8 @@ function App() {
         platform: 'instagram',
         tone: 'casual',
         generateImages: true,
-        grokApiKey: autoDiscoverySettings.grokApiKey
+        grokApiKey: autoDiscoverySettings.grokApiKey,
+        ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint
       })
       setDailyContents(daily)
       await cacheDailyContent(daily)
