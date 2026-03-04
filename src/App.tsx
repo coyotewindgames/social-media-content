@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { ContentIdea, CaptionTone, Platform } from '@/lib/types'
 import { ContentCard } from '@/components/ContentCard'
+import { DailyContentCard } from '@/components/DailyContentCard'
 import { ContentDialog } from '@/components/ContentDialog'
 import { EmptyState } from '@/components/EmptyState'
 import { AccountsDialog } from '@/components/AccountsDialog'
@@ -11,6 +12,7 @@ import { AutoDiscoverySettingsDialog } from '@/components/AutoDiscoverySettingsD
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard'
 import { AccountComparisonDialog } from '@/components/AccountComparisonDialog'
 import { useAutoDiscovery } from '@/hooks/use-auto-discovery'
+import { getOrGenerateDailyContent, regenerateDailyContent, cacheDailyContent, generateDailyContent } from '@/lib/daily-content-generator'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -23,13 +25,15 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell, ChartLine, Scales } from '@phosphor-icons/react'
+import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell, ChartLine, Scales, ArrowsClockwise } from '@phosphor-icons/react'
 import { Calendar } from '@/components/ui/calendar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, Toaster } from 'sonner'
 
 function App() {
   const [contents, setContents] = useKV<ContentIdea[]>('content-ideas', [])
+  const [dailyContents, setDailyContents] = useState<ContentIdea[]>([])
+  const [loadingDaily, setLoadingDaily] = useState(false)
   const [selectedContent, setSelectedContent] = useState<ContentIdea | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [accountsDialogOpen, setAccountsDialogOpen] = useState(false)
@@ -41,7 +45,7 @@ function App() {
   const [contentToPublish, setContentToPublish] = useState<ContentIdea | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
-  const [view, setView] = useState<'list' | 'calendar'>('list')
+  const [view, setView] = useState<'list' | 'calendar' | 'daily'>('daily')
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
 
   const { settings: autoDiscoverySettings, updateSettings: updateAutoDiscoverySettings } = useAutoDiscovery(
@@ -52,6 +56,34 @@ function App() {
       })
     }
   )
+
+  useEffect(() => {
+    const loadDailyContent = async () => {
+      setLoadingDaily(true)
+      try {
+        const { contents: daily, fromCache } = await getOrGenerateDailyContent({
+          count: 5,
+          platform: 'instagram',
+          tone: 'casual',
+          generateImages: true,
+          grokApiKey: autoDiscoverySettings.grokApiKey
+        })
+        setDailyContents(daily)
+        if (!fromCache) {
+          toast.success('Fresh daily content generated!', {
+            description: `${daily.length} new AI-generated posts ready for Instagram`,
+          })
+        }
+      } catch (error) {
+        console.error('Failed to load daily content:', error)
+        toast.error('Failed to load daily content')
+      } finally {
+        setLoadingDaily(false)
+      }
+    }
+
+    loadDailyContent()
+  }, [])
 
   const handleCreateNew = () => {
     setSelectedContent(null)
@@ -119,18 +151,28 @@ function App() {
 
         const mockPostUrl = `https://instagram.com/p/${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
 
-        setContents((currentContents) =>
-          (currentContents || []).map((c) =>
-            c.id === content.id
-              ? {
-                  ...c,
-                  status: 'published' as const,
-                  publishedUrl: mockPostUrl,
-                  publishedAt: new Date().toISOString(),
-                }
-              : c
+        const updatedContent = {
+          ...content,
+          status: 'published' as const,
+          publishedUrl: mockPostUrl,
+          publishedAt: new Date().toISOString(),
+        }
+
+        if (content.id.startsWith('daily-')) {
+          const index = dailyContents.findIndex(c => c.id === content.id)
+          if (index !== -1) {
+            const updatedDaily = [...dailyContents]
+            updatedDaily[index] = updatedContent
+            setDailyContents(updatedDaily)
+            await cacheDailyContent(updatedDaily)
+          }
+        } else {
+          setContents((currentContents) =>
+            (currentContents || []).map((c) =>
+              c.id === content.id ? updatedContent : c
+            )
           )
-        )
+        }
 
         return mockPostUrl
       })(),
@@ -140,6 +182,61 @@ function App() {
         error: 'Failed to upload to Instagram',
       }
     )
+  }
+
+  const handleRegenerateDaily = async (content: ContentIdea) => {
+    const index = dailyContents.findIndex(c => c.id === content.id)
+    if (index === -1) return
+
+    toast.promise(
+      (async () => {
+        const newContent = await regenerateDailyContent(index, {
+          platform: 'instagram',
+          tone: 'casual',
+          generateImages: true,
+          grokApiKey: autoDiscoverySettings.grokApiKey
+        })
+        
+        const updated = [...dailyContents]
+        updated[index] = newContent
+        setDailyContents(updated)
+        
+        return newContent.title
+      })(),
+      {
+        loading: 'Regenerating content...',
+        success: (title) => `New content ready: ${title}`,
+        error: 'Failed to regenerate content',
+      }
+    )
+  }
+
+  const handleScheduleDaily = (content: ContentIdea) => {
+    setSelectedContent(content)
+    setDialogOpen(true)
+  }
+
+  const handleRefreshDailyContent = async () => {
+    setLoadingDaily(true)
+    try {
+      const daily = await generateDailyContent({
+        count: 5,
+        platform: 'instagram',
+        tone: 'casual',
+        generateImages: true,
+        grokApiKey: autoDiscoverySettings.grokApiKey
+      })
+      setDailyContents(daily)
+      await cacheDailyContent(daily)
+      toast.success('Daily content refreshed!', {
+        description: `${daily.length} fresh AI-generated posts ready`,
+      })
+    } catch (error) {
+      console.error('Failed to refresh daily content:', error)
+      toast.error('Failed to refresh daily content')
+    } finally {
+      setLoadingDaily(false)
+    }
   }
 
   const handleGenerateCaption = async (
@@ -373,8 +470,12 @@ Return ONLY valid JSON:
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <Tabs value={view} onValueChange={(v) => setView(v as 'list' | 'calendar')}>
+        <Tabs value={view} onValueChange={(v) => setView(v as 'list' | 'calendar' | 'daily')}>
           <TabsList className="mb-6">
+            <TabsTrigger value="daily" className="gap-2">
+              <Sparkle size={18} weight="duotone" />
+              Daily AI Content
+            </TabsTrigger>
             <TabsTrigger value="list" className="gap-2">
               <List size={18} />
               Library
@@ -384,6 +485,69 @@ Return ONLY valid JSON:
               Calendar
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="daily">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <Sparkle size={28} weight="duotone" className="text-accent" />
+                    Today's AI-Generated Content
+                  </h2>
+                  <p className="text-muted-foreground mt-1">
+                    Fresh content ideas with images, ready to upload to Instagram
+                  </p>
+                </div>
+                <Button
+                  onClick={handleRefreshDailyContent}
+                  variant="outline"
+                  size="lg"
+                  disabled={loadingDaily}
+                  className="border-accent/50 text-accent hover:bg-accent/10"
+                >
+                  <ArrowsClockwise size={20} weight="bold" className="mr-2" />
+                  {loadingDaily ? 'Generating...' : 'Refresh'}
+                </Button>
+              </div>
+
+              {loadingDaily ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className="h-[500px] bg-muted animate-pulse rounded-lg" />
+                  ))}
+                </div>
+              ) : dailyContents.length === 0 ? (
+                <div className="text-center py-20 bg-card rounded-lg border-2 border-dashed">
+                  <Sparkle size={48} weight="duotone" className="mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">
+                    No daily content available yet
+                  </p>
+                  <Button onClick={handleRefreshDailyContent} size="lg" className="bg-gradient-to-r from-accent to-primary">
+                    <Sparkle size={20} weight="bold" className="mr-2" />
+                    Generate Daily Content
+                  </Button>
+                </div>
+              ) : (
+                <motion.div
+                  className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                  layout
+                >
+                  <AnimatePresence>
+                    {dailyContents.map((content, index) => (
+                      <DailyContentCard
+                        key={content.id}
+                        content={content}
+                        onInstagramUpload={handleInstagramUpload}
+                        onSchedule={handleScheduleDaily}
+                        onRegenerate={handleRegenerateDaily}
+                        index={index}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </div>
+          </TabsContent>
 
           <TabsContent value="list">
             {(contents || []).length === 0 ? (
