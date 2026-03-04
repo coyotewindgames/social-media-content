@@ -2,22 +2,20 @@ import { ContentIdea } from '@/lib/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { InstagramLogo, Sparkle, CalendarPlus, Copy, ArrowsClockwise, TrendUp, Newspaper } from '@phosphor-icons/react'
+import { InstagramLogo, Sparkle, Copy, ArrowsClockwise, TrendUp, Newspaper } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
 interface DailyContentCardProps {
   content: ContentIdea
   onInstagramUpload: (content: ContentIdea) => void
-  onSchedule?: (content: ContentIdea) => void
-  onRegenerate?: (content: ContentIdea) => void
+  onRegenerate: (content: ContentIdea) => void
   index: number
 }
 
 export function DailyContentCard({ 
   content, 
   onInstagramUpload, 
-  onSchedule,
   onRegenerate,
   index 
 }: DailyContentCardProps) {
@@ -147,20 +145,6 @@ export function DailyContentCard({
               >
                 <InstagramLogo size={18} weight="fill" className="mr-2" />
                 Upload to Instagram
-              </Button>
-            )}
-            
-            {!isPublished && onSchedule && (
-              <Button
-                variant="outline"
-                size="icon"
-                className="border-primary/50 text-primary hover:bg-primary/10"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onSchedule(content)
-                }}
-              >
-                <CalendarPlus size={18} weight="duotone" />
               </Button>
             )}
           </div>

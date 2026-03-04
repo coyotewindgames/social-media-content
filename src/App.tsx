@@ -211,11 +211,6 @@ function App() {
     )
   }
 
-  const handleScheduleDaily = (content: ContentIdea) => {
-    setSelectedContent(content)
-    setDialogOpen(true)
-  }
-
   const handleRefreshDailyContent = async () => {
     setLoadingDaily(true)
     try {
@@ -538,7 +533,6 @@ Return ONLY valid JSON:
                         key={content.id}
                         content={content}
                         onInstagramUpload={handleInstagramUpload}
-                        onSchedule={handleScheduleDaily}
                         onRegenerate={handleRegenerateDaily}
                         index={index}
                       />
