@@ -23,6 +23,8 @@ export interface ContentIdea {
   errorMessage?: string
   generatedImageUrl?: string
   imagePrompt?: string
+  imageDataUrl?: string
+  generatedByAutoDiscovery?: boolean
 }
 
 export interface SocialAccount {

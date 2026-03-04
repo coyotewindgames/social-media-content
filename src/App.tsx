@@ -107,6 +107,41 @@ function App() {
     )
   }
 
+  const handleInstagramUpload = (content: ContentIdea) => {
+    toast.promise(
+      (async () => {
+        const imageUrl = content.imageDataUrl || content.generatedImageUrl
+        if (!imageUrl) {
+          throw new Error('No image available for upload')
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 2000))
+
+        const mockPostUrl = `https://instagram.com/p/${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+        setContents((currentContents) =>
+          (currentContents || []).map((c) =>
+            c.id === content.id
+              ? {
+                  ...c,
+                  status: 'published' as const,
+                  publishedUrl: mockPostUrl,
+                  publishedAt: new Date().toISOString(),
+                }
+              : c
+          )
+        )
+
+        return mockPostUrl
+      })(),
+      {
+        loading: 'Uploading to Instagram...',
+        success: 'Successfully uploaded to Instagram!',
+        error: 'Failed to upload to Instagram',
+      }
+    )
+  }
+
   const handleGenerateCaption = async (
     description: string,
     tone: CaptionTone
@@ -372,6 +407,7 @@ Return ONLY valid JSON:
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       onPublish={handlePublish}
+                      onInstagramUpload={handleInstagramUpload}
                     />
                   ))}
                 </AnimatePresence>
@@ -429,6 +465,7 @@ Return ONLY valid JSON:
                         onEdit={handleEdit}
                         onDelete={handleDelete}
                         onPublish={handlePublish}
+                        onInstagramUpload={handleInstagramUpload}
                       />
                     ))}
                   </div>

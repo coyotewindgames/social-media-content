@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
   Select,
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Clock, Gear, Check, X } from '@phosphor-icons/react'
+import { Clock, Gear, Check, X, Key, Image } from '@phosphor-icons/react'
 
 interface AutoDiscoverySettingsDialogProps {
   open: boolean
@@ -90,7 +91,7 @@ export function AutoDiscoverySettingsDialog({
             Auto-Discovery Settings
           </DialogTitle>
           <DialogDescription>
-            Automatically discover trending topics and generate content ideas on a schedule
+            Automatically discover trending topics and generate content with images on a schedule
           </DialogDescription>
         </DialogHeader>
 
@@ -117,6 +118,34 @@ export function AutoDiscoverySettingsDialog({
 
           {localSettings.enabled && (
             <>
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Key size={18} weight="duotone" className="text-accent" />
+                  Grok API Key
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Required for AI image generation. Get your API key from{' '}
+                  <a
+                    href="https://console.x.ai"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    X.AI Console
+                  </a>
+                </p>
+                <Input
+                  type="password"
+                  placeholder="xai-••••••••••••••••"
+                  value={localSettings.grokApiKey || ''}
+                  onChange={(e) =>
+                    setLocalSettings((prev) => ({ ...prev, grokApiKey: e.target.value }))
+                  }
+                />
+              </div>
+
               <Separator />
 
               <div className="space-y-3">
@@ -168,6 +197,25 @@ export function AutoDiscoverySettingsDialog({
 
               {localSettings.autoGenerate && (
                 <>
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <Label htmlFor="auto-generate-images" className="text-base font-medium flex items-center gap-2">
+                        <Image size={18} weight="duotone" className="text-accent" />
+                        Auto-Generate Images
+                      </Label>
+                      <p className="text-sm text-muted-foreground">
+                        Generate AI images with Grok for each content idea
+                      </p>
+                    </div>
+                    <Switch
+                      id="auto-generate-images"
+                      checked={localSettings.autoGenerateImages}
+                      onCheckedChange={(autoGenerateImages) =>
+                        setLocalSettings((prev) => ({ ...prev, autoGenerateImages }))
+                      }
+                    />
+                  </div>
+
                   <div className="space-y-3">
                     <Label className="text-base font-medium">Max Topics Per Run</Label>
                     <Select

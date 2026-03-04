@@ -1,4 +1,5 @@
 import { ContentIdea, Platform, CaptionTone } from './types'
+import { generateImageWithGrok, hasGrokApiKey } from './grok-image-generation'
 
 export interface TrendingTopic {
   topic: string
@@ -14,16 +15,19 @@ export interface AutoDiscoverySettings {
   lastRunAt?: string
   nextRunAt?: string
   autoGenerate: boolean
+  autoGenerateImages: boolean
   defaultPlatform: Platform
   defaultTone: CaptionTone
   maxTopicsPerRun: number
   categories: string[]
+  grokApiKey?: string
 }
 
 export const DEFAULT_AUTO_DISCOVERY_SETTINGS: AutoDiscoverySettings = {
   enabled: false,
   frequency: 'daily',
   autoGenerate: false,
+  autoGenerateImages: true,
   defaultPlatform: 'instagram',
   defaultTone: 'casual',
   maxTopicsPerRun: 5,
@@ -79,7 +83,9 @@ Make topics diverse across categories and genuinely reflect current events and c
 export async function generateContentFromTopic(
   topic: TrendingTopic,
   platform: Platform,
-  tone: CaptionTone
+  tone: CaptionTone,
+  generateImage: boolean = false,
+  grokApiKey?: string
 ): Promise<Omit<ContentIdea, 'id' | 'createdAt' | 'updatedAt'>> {
   const prompt = window.spark.llmPrompt`You are a social media content strategist. Create a compelling content idea for ${platform} based on this trending topic:
 
@@ -104,14 +110,35 @@ Return ONLY valid JSON:
   const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
   const data = JSON.parse(response)
 
-  return {
+  const contentIdea: Omit<ContentIdea, 'id' | 'createdAt' | 'updatedAt'> = {
     title: data.title || topic.topic,
     description: data.description || topic.contentAngle,
     caption: data.caption || '',
     platform,
     status: 'idea',
     notes: `Auto-discovered from trending topic: ${topic.topic}\n\nRelevance: ${topic.relevance}\n\nDiscovered at: ${new Date().toLocaleString()}`,
+    generatedByAutoDiscovery: true,
   }
+
+  if (generateImage) {
+    const hasKey = await hasGrokApiKey()
+    if (hasKey || grokApiKey) {
+      const imageResult = await generateImageWithGrok(
+        contentIdea.title,
+        contentIdea.description,
+        platform,
+        grokApiKey
+      )
+      
+      if (imageResult.success) {
+        contentIdea.imageDataUrl = imageResult.imageDataUrl
+        contentIdea.generatedImageUrl = imageResult.imageUrl
+        contentIdea.imagePrompt = imageResult.prompt
+      }
+    }
+  }
+
+  return contentIdea
 }
 
 export function calculateNextRunTime(frequency: 'daily' | 'weekly', fromDate: Date = new Date()): Date {

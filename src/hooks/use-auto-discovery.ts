@@ -57,7 +57,9 @@ export function useAutoDiscovery(
           const contentData = await generateContentFromTopic(
             topic,
             settings.defaultPlatform,
-            settings.defaultTone
+            settings.defaultTone,
+            settings.autoGenerateImages,
+            settings.grokApiKey
           )
 
           const newContent: ContentIdea = {
