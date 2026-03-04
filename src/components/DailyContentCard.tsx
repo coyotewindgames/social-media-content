@@ -2,7 +2,7 @@ import { ContentIdea } from '@/lib/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { InstagramLogo, Sparkle, CalendarPlus, Copy, ArrowsClockwise } from '@phosphor-icons/react'
+import { InstagramLogo, Sparkle, CalendarPlus, Copy, ArrowsClockwise, TrendUp, Newspaper } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
@@ -29,6 +29,10 @@ export function DailyContentCard({
 
   const imageUrl = content.imageDataUrl || content.generatedImageUrl
   const isPublished = content.status === 'published'
+  
+  const notesLines = content.notes?.split('\n') || []
+  const trendingInfo = notesLines.find(line => line.includes('🔥 Trending Now:'))?.replace('🔥 Trending Now:', '').trim()
+  const newsHook = notesLines.find(line => line.includes('📰 News Hook:'))?.replace('📰 News Hook:', '').trim()
 
   return (
     <motion.div
@@ -41,13 +45,22 @@ export function DailyContentCard({
         <CardHeader className="pb-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkle size={20} weight="duotone" className="text-accent" />
-                <Badge className="bg-gradient-to-r from-accent to-primary text-white text-xs border-0">
-                  AI Generated Today
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <Badge className="bg-gradient-to-r from-red-500 to-orange-500 text-white text-xs border-0 animate-pulse">
+                  <TrendUp size={14} weight="fill" className="mr-1" />
+                  Trending Now
+                </Badge>
+                <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                  <Newspaper size={14} weight="duotone" className="mr-1" />
+                  News-Driven
                 </Badge>
               </div>
               <h3 className="font-bold text-xl mb-1 leading-tight">{content.title}</h3>
+              {trendingInfo && (
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                  📍 {trendingInfo}
+                </p>
+              )}
             </div>
             {onRegenerate && !isPublished && (
               <Button
@@ -75,6 +88,7 @@ export function DailyContentCard({
               />
               <div className="absolute top-3 right-3">
                 <Badge className="bg-black/70 text-white backdrop-blur-sm border-0 text-xs">
+                  <Sparkle size={12} weight="fill" className="mr-1" />
                   AI Image
                 </Badge>
               </div>
@@ -86,6 +100,15 @@ export function DailyContentCard({
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {newsHook && (
+            <div className="bg-primary/10 border border-primary/30 rounded-lg p-3">
+              <p className="text-xs font-medium text-primary flex items-start gap-2">
+                <TrendUp size={16} weight="duotone" className="flex-shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{newsHook}</span>
+              </p>
             </div>
           )}
 

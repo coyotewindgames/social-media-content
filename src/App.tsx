@@ -70,8 +70,8 @@ function App() {
         })
         setDailyContents(daily)
         if (!fromCache) {
-          toast.success('Fresh daily content generated!', {
-            description: `${daily.length} new AI-generated posts ready for Instagram`,
+          toast.success('Fresh trending content generated!', {
+            description: `${daily.length} news-driven posts based on today's trends`,
           })
         }
       } catch (error) {
@@ -228,8 +228,8 @@ function App() {
       })
       setDailyContents(daily)
       await cacheDailyContent(daily)
-      toast.success('Daily content refreshed!', {
-        description: `${daily.length} fresh AI-generated posts ready`,
+      toast.success('Fresh trending content generated!', {
+        description: `${daily.length} news-driven posts based on what's hot right now`,
       })
     } catch (error) {
       console.error('Failed to refresh daily content:', error)
@@ -474,7 +474,7 @@ Return ONLY valid JSON:
           <TabsList className="mb-6">
             <TabsTrigger value="daily" className="gap-2">
               <Sparkle size={18} weight="duotone" />
-              Daily AI Content
+              Daily Trending
             </TabsTrigger>
             <TabsTrigger value="list" className="gap-2">
               <List size={18} />
@@ -492,10 +492,10 @@ Return ONLY valid JSON:
                 <div>
                   <h2 className="text-2xl font-bold flex items-center gap-2">
                     <Sparkle size={28} weight="duotone" className="text-accent" />
-                    Today's AI-Generated Content
+                    Today's Trending Content
                   </h2>
                   <p className="text-muted-foreground mt-1">
-                    Fresh content ideas with images, ready to upload to Instagram
+                    AI-generated posts based on real-time news and trending topics with images, ready to upload to Instagram
                   </p>
                 </div>
                 <Button
