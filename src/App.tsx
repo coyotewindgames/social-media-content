@@ -7,6 +7,8 @@ import { EmptyState } from '@/components/EmptyState'
 import { AccountsDialog } from '@/components/AccountsDialog'
 import { PublishDialog } from '@/components/PublishDialog'
 import { TrendingTopicsDialog } from '@/components/TrendingTopicsDialog'
+import { AutoDiscoverySettingsDialog } from '@/components/AutoDiscoverySettingsDialog'
+import { useAutoDiscovery } from '@/hooks/use-auto-discovery'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -18,7 +20,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp } from '@phosphor-icons/react'
+import { Badge } from '@/components/ui/badge'
+import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell } from '@phosphor-icons/react'
 import { Calendar } from '@/components/ui/calendar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, Toaster } from 'sonner'
@@ -30,11 +33,21 @@ function App() {
   const [accountsDialogOpen, setAccountsDialogOpen] = useState(false)
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
   const [trendingDialogOpen, setTrendingDialogOpen] = useState(false)
+  const [autoDiscoverySettingsOpen, setAutoDiscoverySettingsOpen] = useState(false)
   const [contentToPublish, setContentToPublish] = useState<ContentIdea | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
   const [view, setView] = useState<'list' | 'calendar'>('list')
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
+
+  const { settings: autoDiscoverySettings, updateSettings: updateAutoDiscoverySettings } = useAutoDiscovery(
+    (newContents) => {
+      setContents((currentContents) => [...(currentContents || []), ...newContents])
+      toast.success(`Auto-discovery generated ${newContents.length} new content idea${newContents.length !== 1 ? 's' : ''}!`, {
+        description: 'Check your library to review the new ideas.',
+      })
+    }
+  )
 
   const handleCreateNew = () => {
     setSelectedContent(null)
@@ -234,6 +247,23 @@ Return ONLY valid JSON:
                 Discover Trends
               </Button>
               <Button
+                onClick={() => setAutoDiscoverySettingsOpen(true)}
+                variant="outline"
+                size="lg"
+                className="relative"
+              >
+                <Gear size={20} weight="duotone" className="mr-2" />
+                Auto-Discovery
+                {autoDiscoverySettings.enabled && (
+                  <Badge 
+                    variant="default" 
+                    className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-green-500 border-2 border-background"
+                  >
+                    <Bell size={12} weight="fill" className="text-white" />
+                  </Badge>
+                )}
+              </Button>
+              <Button
                 onClick={() => setAccountsDialogOpen(true)}
                 variant="outline"
                 size="lg"
@@ -414,6 +444,13 @@ Return ONLY valid JSON:
         open={trendingDialogOpen}
         onClose={() => setTrendingDialogOpen(false)}
         onGenerateContent={handleGenerateFromTrending}
+      />
+
+      <AutoDiscoverySettingsDialog
+        open={autoDiscoverySettingsOpen}
+        onClose={() => setAutoDiscoverySettingsOpen(false)}
+        settings={autoDiscoverySettings}
+        onSave={updateAutoDiscoverySettings}
       />
     </div>
   )

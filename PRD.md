@@ -12,10 +12,24 @@ This is a full-featured social media automation platform with OAuth authenticati
 
 ## Essential Features
 
-### Trending Topics Discovery (NEW)
+### Scheduled Auto-Discovery (NEW)
+- **Functionality**: Automatically discover trending topics and optionally generate content ideas on a daily or weekly schedule
+- **Purpose**: Keeps the content library fresh with minimal manual effort by automatically sourcing trending topics
+- **Trigger**: Runs automatically based on configured schedule (daily at 9 AM or weekly on Monday at 9 AM), or manually via settings
+- **Progression**: System checks schedule → Fetches trending topics → Optionally generates content ideas → Saves to library → Notifies user
+- **Success criteria**: Successfully runs on schedule, fetches relevant trending topics, generates complete content ideas with correct metadata, and provides clear notifications to the user
+
+### Auto-Discovery Settings
+- **Functionality**: Configure automatic trending topic discovery and content generation
+- **Purpose**: Gives users control over automation preferences and content focus
+- **Trigger**: User clicks "Auto-Discovery" button in header
+- **Progression**: Open settings dialog → Toggle auto-discovery on/off → Select frequency (daily/weekly) → Enable/disable auto-generation → Choose platform and tone → Select preferred categories → Save settings
+- **Success criteria**: All settings persist correctly, schedule calculates properly, and visual indicator shows when auto-discovery is enabled
+
+### Trending Topics Discovery
 - **Functionality**: Automatically discover trending topics and generate content ideas from them
 - **Purpose**: Helps creators stay relevant by creating content around what's currently trending
-- **Trigger**: User clicks "Discover Trends" button in the header
+- **Trigger**: User clicks "Discover Trends" button in the header OR runs automatically via schedule
 - **Progression**: Select timeframe (today/this week) → Discover trends → Review trending topics with categories and relevance → Select topics → Choose platform and tone → Generate content ideas automatically
 - **Success criteria**: Displays 8 diverse trending topics across categories, allows multi-select, and generates complete content ideas with titles, descriptions, and captions
 
