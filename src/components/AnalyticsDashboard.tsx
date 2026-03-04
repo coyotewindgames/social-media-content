@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useKV } from '@github/spark/hooks'
 import { SocialAccount, AccountAnalytics, Platform } from '@/lib/types'
 import { AnalyticsAPI } from '@/lib/analytics-api'
+import { PerformanceInsights } from '@/components/PerformanceInsights'
 import {
   Dialog,
   DialogContent,
@@ -305,10 +306,11 @@ export function AnalyticsDashboard({ open, onClose }: AnalyticsDashboardProps) {
             </div>
 
             <Tabs defaultValue="overview" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="growth">Growth</TabsTrigger>
                 <TabsTrigger value="engagement">Engagement</TabsTrigger>
+                <TabsTrigger value="insights">Insights</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
@@ -584,6 +586,10 @@ export function AnalyticsDashboard({ open, onClose }: AnalyticsDashboardProps) {
                     )}
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="insights" className="space-y-6">
+                <PerformanceInsights analytics={selectedAnalytics} timeRange={timeRange} />
               </TabsContent>
             </Tabs>
           </div>

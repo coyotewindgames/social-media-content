@@ -12,6 +12,20 @@ This is a full-featured social media automation platform with OAuth authenticati
 
 ## Essential Features
 
+### Performance Insights & Recommendations (NEW)
+- **Functionality**: AI-powered analysis of account performance with actionable recommendations for improvement
+- **Purpose**: Helps creators understand their performance metrics and provides specific, data-driven suggestions to grow their audience
+- **Trigger**: User opens Analytics Dashboard and navigates to the "Insights" tab
+- **Progression**: View analytics data → AI analyzes metrics → Display insights cards (growth, engagement, content frequency, etc.) → Show prioritized recommendations with impact/effort ratings → Display quick wins with best posting times and goals
+- **Success criteria**: Generates relevant insights based on actual metrics, provides actionable recommendations categorized by impact and effort, adapts to different platforms and time ranges
+
+### Analytics Dashboard
+- **Functionality**: Track follower growth, engagement metrics, and post performance across connected accounts
+- **Purpose**: Provides data-driven insights into account performance to inform content strategy
+- **Trigger**: User clicks "Analytics" button in header
+- **Progression**: Select account → Choose time range (7/30/90 days) → View overview stats → Explore growth trends → Review engagement breakdown → Access performance insights
+- **Success criteria**: Displays real-time analytics with charts, historical data visualization, and AI-powered performance insights
+
 ### Scheduled Auto-Discovery (NEW)
 - **Functionality**: Automatically discover trending topics and optionally generate content ideas on a daily or weekly schedule
 - **Purpose**: Keeps the content library fresh with minimal manual effort by automatically sourcing trending topics
