@@ -8,6 +8,7 @@ import { AccountsDialog } from '@/components/AccountsDialog'
 import { PublishDialog } from '@/components/PublishDialog'
 import { TrendingTopicsDialog } from '@/components/TrendingTopicsDialog'
 import { AutoDiscoverySettingsDialog } from '@/components/AutoDiscoverySettingsDialog'
+import { AnalyticsDashboard } from '@/components/AnalyticsDashboard'
 import { useAutoDiscovery } from '@/hooks/use-auto-discovery'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell } from '@phosphor-icons/react'
+import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell, ChartLine } from '@phosphor-icons/react'
 import { Calendar } from '@/components/ui/calendar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, Toaster } from 'sonner'
@@ -34,6 +35,7 @@ function App() {
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
   const [trendingDialogOpen, setTrendingDialogOpen] = useState(false)
   const [autoDiscoverySettingsOpen, setAutoDiscoverySettingsOpen] = useState(false)
+  const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false)
   const [contentToPublish, setContentToPublish] = useState<ContentIdea | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
@@ -237,6 +239,15 @@ Return ONLY valid JSON:
               </p>
             </div>
             <div className="flex items-center gap-3">
+              <Button
+                onClick={() => setAnalyticsDialogOpen(true)}
+                variant="outline"
+                size="lg"
+                className="border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <ChartLine size={20} weight="duotone" className="mr-2" />
+                Analytics
+              </Button>
               <Button
                 onClick={() => setTrendingDialogOpen(true)}
                 variant="outline"
@@ -451,6 +462,11 @@ Return ONLY valid JSON:
         onClose={() => setAutoDiscoverySettingsOpen(false)}
         settings={autoDiscoverySettings}
         onSave={updateAutoDiscoverySettings}
+      />
+
+      <AnalyticsDashboard
+        open={analyticsDialogOpen}
+        onClose={() => setAnalyticsDialogOpen(false)}
       />
     </div>
   )
