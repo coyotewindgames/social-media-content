@@ -12,6 +12,13 @@ This is a full-featured social media automation platform with OAuth authenticati
 
 ## Essential Features
 
+### Free Sources Testing (NEW)
+- **Functionality**: Test and verify free news sources (Hacker News and Reddit) for trending content generation
+- **Purpose**: Allows developers and users to validate that free content sources are working correctly without requiring API keys
+- **Trigger**: User clicks "Test Sources" button in header (green button with test tube icon)
+- **Progression**: Open test dialog → Click "Run All Tests" → System tests Hacker News API → System tests Reddit API → Display results with metrics → View detailed topics from each source → Click on topics to see full details
+- **Success criteria**: Successfully fetches and displays trending topics from both sources, shows response times and status indicators, allows drilling down into topic details with links to original content
+
 ### AI Image Generation (NEW)
 - **Functionality**: Generate images from content ideas using AI text-to-image generation
 - **Purpose**: Automates visual content creation, providing high-quality images that match the content description and platform requirements

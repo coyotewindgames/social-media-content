@@ -11,6 +11,7 @@ import { TrendingTopicsDialog } from '@/components/TrendingTopicsDialog'
 import { AutoDiscoverySettingsDialog } from '@/components/AutoDiscoverySettingsDialog'
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard'
 import { AccountComparisonDialog } from '@/components/AccountComparisonDialog'
+import { FreeSourcesTestDialog } from '@/components/FreeSourcesTestDialog'
 import { useAutoDiscovery } from '@/hooks/use-auto-discovery'
 import { getOrGenerateDailyContent, regenerateDailyContent, cacheDailyContent, generateDailyContent } from '@/lib/daily-content-generator'
 import { Button } from '@/components/ui/button'
@@ -25,7 +26,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell, ChartLine, Scales, ArrowsClockwise } from '@phosphor-icons/react'
+import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell, ChartLine, Scales, ArrowsClockwise, TestTube } from '@phosphor-icons/react'
 import { Calendar } from '@/components/ui/calendar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, Toaster } from 'sonner'
@@ -42,6 +43,7 @@ function App() {
   const [autoDiscoverySettingsOpen, setAutoDiscoverySettingsOpen] = useState(false)
   const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false)
   const [comparisonDialogOpen, setComparisonDialogOpen] = useState(false)
+  const [freeSourcesTestOpen, setFreeSourcesTestOpen] = useState(false)
   const [contentToPublish, setContentToPublish] = useState<ContentIdea | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
@@ -384,6 +386,15 @@ Return ONLY valid JSON:
             </div>
             <div className="flex items-center gap-3">
               <Button
+                onClick={() => setFreeSourcesTestOpen(true)}
+                variant="outline"
+                size="lg"
+                className="border-green-500/50 text-green-600 hover:bg-green-500/10"
+              >
+                <TestTube size={20} weight="duotone" className="mr-2" />
+                Test Sources
+              </Button>
+              <Button
                 onClick={() => setComparisonDialogOpen(true)}
                 variant="outline"
                 size="lg"
@@ -693,6 +704,11 @@ Return ONLY valid JSON:
       <AccountComparisonDialog
         open={comparisonDialogOpen}
         onClose={() => setComparisonDialogOpen(false)}
+      />
+
+      <FreeSourcesTestDialog
+        open={freeSourcesTestOpen}
+        onClose={() => setFreeSourcesTestOpen(false)}
       />
     </div>
   )
