@@ -21,6 +21,8 @@ export interface ContentIdea {
   publishedUrl?: string
   publishedAt?: string
   errorMessage?: string
+  generatedImageUrl?: string
+  imagePrompt?: string
 }
 
 export interface SocialAccount {

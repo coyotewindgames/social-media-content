@@ -98,6 +98,15 @@ export function ContentCard({ content, onEdit, onDelete, onPublish }: ContentCar
           </div>
         </CardHeader>
         <CardContent className="pb-4" onClick={() => onEdit(content)}>
+          {content.generatedImageUrl && (
+            <div className="mb-3 rounded-md overflow-hidden border-2 border-primary/20">
+              <img
+                src={content.generatedImageUrl}
+                alt={content.title}
+                className="w-full h-48 object-cover"
+              />
+            </div>
+          )}
           <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
             {content.description}
           </p>

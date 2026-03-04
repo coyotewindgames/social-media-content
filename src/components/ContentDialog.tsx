@@ -20,9 +20,10 @@ import {
 } from '@/components/ui/select'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Sparkle, CalendarBlank } from '@phosphor-icons/react'
+import { Sparkle, CalendarBlank, Image, X } from '@phosphor-icons/react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
+import { generateImageFromContent } from '@/lib/image-generation'
 
 interface ContentDialogProps {
   content: ContentIdea | null
@@ -54,6 +55,7 @@ export function ContentDialog({
   )
   const [selectedTone, setSelectedTone] = useState<CaptionTone>('casual')
   const [generating, setGenerating] = useState(false)
+  const [generatingImage, setGeneratingImage] = useState(false)
   const [suggestions, setSuggestions] = useState<string[]>([])
 
   const handleGenerateCaption = async () => {
@@ -72,6 +74,45 @@ export function ContentDialog({
     } finally {
       setGenerating(false)
     }
+  }
+
+  const handleGenerateImage = async () => {
+    if (!formData.title.trim() || !formData.description.trim()) {
+      toast.error('Please add a title and description first')
+      return
+    }
+
+    setGeneratingImage(true)
+    try {
+      const result = await generateImageFromContent(
+        formData.title,
+        formData.description,
+        formData.platform
+      )
+
+      if (result.success && result.imageUrl) {
+        setFormData({
+          ...formData,
+          generatedImageUrl: result.imageUrl,
+          imagePrompt: result.prompt,
+        })
+        toast.success('Image generated successfully!')
+      } else {
+        toast.error(result.error || 'Failed to generate image')
+      }
+    } catch (error) {
+      toast.error('Failed to generate image')
+    } finally {
+      setGeneratingImage(false)
+    }
+  }
+
+  const handleRemoveImage = () => {
+    setFormData({
+      ...formData,
+      generatedImageUrl: undefined,
+      imagePrompt: undefined,
+    })
   }
 
   const handleSave = () => {
@@ -175,6 +216,44 @@ export function ContentDialog({
                 </PopoverContent>
               </Popover>
             </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <div className="flex items-center justify-between mb-3">
+              <Label>AI Image Generator</Label>
+              <Button
+                onClick={handleGenerateImage}
+                disabled={generatingImage}
+                variant="outline"
+                className="border-primary/50 text-primary hover:bg-primary/10"
+              >
+                <Image size={16} className="mr-2" weight="duotone" />
+                {generatingImage ? 'Generating...' : 'Generate Image'}
+              </Button>
+            </div>
+
+            {formData.generatedImageUrl && (
+              <div className="relative group mb-3">
+                <img
+                  src={formData.generatedImageUrl}
+                  alt="Generated content"
+                  className="w-full h-auto rounded-lg border-2 border-primary/20"
+                />
+                <Button
+                  onClick={handleRemoveImage}
+                  size="icon"
+                  variant="destructive"
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={16} />
+                </Button>
+                {formData.imagePrompt && (
+                  <p className="text-xs text-muted-foreground mt-2 italic">
+                    Prompt: {formData.imagePrompt}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="border-t pt-4">

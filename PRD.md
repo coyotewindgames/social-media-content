@@ -12,6 +12,13 @@ This is a full-featured social media automation platform with OAuth authenticati
 
 ## Essential Features
 
+### AI Image Generation (NEW)
+- **Functionality**: Generate images from content ideas using AI text-to-image generation
+- **Purpose**: Automates visual content creation, providing high-quality images that match the content description and platform requirements
+- **Trigger**: User clicks "Generate Image" button in content creation/edit dialog
+- **Progression**: Enter title and description → Select platform → Click generate → AI creates optimized prompt → API generates image → Display preview with option to regenerate or remove
+- **Success criteria**: Generates platform-optimized images (Instagram: 1080x1080, TikTok: 1080x1920, others: 1200x628), stores image URL with content, displays images in cards and editing dialog
+
 ### Performance Insights & Recommendations (NEW)
 - **Functionality**: AI-powered analysis of account performance with actionable recommendations for improvement
 - **Purpose**: Helps creators understand their performance metrics and provides specific, data-driven suggestions to grow their audience
