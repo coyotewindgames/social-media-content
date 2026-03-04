@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { Clock, Gear, Check, X, Key, Image } from '@phosphor-icons/react'
+import { Clock, Gear, Check, X, Key, Image, Newspaper } from '@phosphor-icons/react'
 
 interface AutoDiscoverySettingsDialogProps {
   open: boolean
@@ -289,6 +289,112 @@ export function AutoDiscoverySettingsDialog({
                   </div>
                 </>
               )}
+
+              <Separator />
+
+              <div className="space-y-3">
+                <Label className="text-base font-medium flex items-center gap-2">
+                  <Newspaper size={18} weight="duotone" className="text-secondary" />
+                  News API Configuration (Optional)
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Add API keys for real-time news sources. The system works without keys using Hacker News & Reddit.
+                </p>
+                
+                <div className="space-y-3 pl-4 border-l-2 border-muted">
+                  <div>
+                    <Label className="text-sm font-medium">NewsAPI.org Key</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Get free API key at{' '}
+                      <a
+                        href="https://newsapi.org/register"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        newsapi.org
+                      </a>
+                    </p>
+                    <Input
+                      type="password"
+                      placeholder="Enter NewsAPI key (optional)"
+                      value={localSettings.newsApiKey || ''}
+                      onChange={(e) =>
+                        setLocalSettings((prev) => ({ ...prev, newsApiKey: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium">GNews API Key</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Get free API key at{' '}
+                      <a
+                        href="https://gnews.io"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        gnews.io
+                      </a>
+                    </p>
+                    <Input
+                      type="password"
+                      placeholder="Enter GNews key (optional)"
+                      value={localSettings.gNewsApiKey || ''}
+                      onChange={(e) =>
+                        setLocalSettings((prev) => ({ ...prev, gNewsApiKey: e.target.value }))
+                      }
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-sm font-medium">News Language</Label>
+                      <Select
+                        value={localSettings.newsLanguage || 'en'}
+                        onValueChange={(value) =>
+                          setLocalSettings((prev) => ({ ...prev, newsLanguage: value }))
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="en">English</SelectItem>
+                          <SelectItem value="es">Spanish</SelectItem>
+                          <SelectItem value="fr">French</SelectItem>
+                          <SelectItem value="de">German</SelectItem>
+                          <SelectItem value="it">Italian</SelectItem>
+                          <SelectItem value="pt">Portuguese</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">News Country</Label>
+                      <Select
+                        value={localSettings.newsCountry || 'us'}
+                        onValueChange={(value) =>
+                          setLocalSettings((prev) => ({ ...prev, newsCountry: value }))
+                        }
+                      >
+                        <SelectTrigger className="h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="us">United States</SelectItem>
+                          <SelectItem value="gb">United Kingdom</SelectItem>
+                          <SelectItem value="ca">Canada</SelectItem>
+                          <SelectItem value="au">Australia</SelectItem>
+                          <SelectItem value="in">India</SelectItem>
+                          <SelectItem value="mx">Mexico</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               <Separator />
 

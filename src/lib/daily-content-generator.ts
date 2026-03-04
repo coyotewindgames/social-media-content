@@ -1,5 +1,5 @@
 import { ContentIdea, Platform, CaptionTone } from './types'
-import { fetchTrendingNews, TrendingTopic } from './news-api'
+import { fetchTrendingNews, TrendingTopic, NewsAPISettings } from './news-api'
 import { generateCaptionWithOllama } from './ollama-api'
 import { generateImageWithGrok } from './grok-image-generation'
 
@@ -10,6 +10,11 @@ export interface DailyContentGenerationOptions {
   generateImages?: boolean
   grokApiKey?: string
   ollamaEndpoint?: string
+  newsApiKey?: string
+  gNewsApiKey?: string
+  newsCategories?: string[]
+  newsLanguage?: string
+  newsCountry?: string
 }
 
 export async function generateDailyContent(
@@ -21,10 +26,23 @@ export async function generateDailyContent(
     tone = 'casual',
     generateImages = true,
     grokApiKey,
-    ollamaEndpoint = 'http://localhost:11434'
+    ollamaEndpoint = 'http://localhost:11434',
+    newsApiKey,
+    gNewsApiKey,
+    newsCategories,
+    newsLanguage,
+    newsCountry
   } = options
 
-  const trendingTopics = await fetchTrendingNews()
+  const newsSettings: NewsAPISettings = {
+    newsApiKey,
+    gNewsApiKey,
+    categories: newsCategories,
+    language: newsLanguage,
+    country: newsCountry
+  }
+
+  const trendingTopics = await fetchTrendingNews(newsSettings)
   
   const selectedTopics = trendingTopics.slice(0, count)
 
@@ -144,10 +162,23 @@ export async function regenerateDailyContent(
     tone = 'casual',
     generateImages = true,
     grokApiKey,
-    ollamaEndpoint = 'http://localhost:11434'
+    ollamaEndpoint = 'http://localhost:11434',
+    newsApiKey,
+    gNewsApiKey,
+    newsCategories,
+    newsLanguage,
+    newsCountry
   } = options
 
-  const trendingTopics = await fetchTrendingNews()
+  const newsSettings: NewsAPISettings = {
+    newsApiKey,
+    gNewsApiKey,
+    categories: newsCategories,
+    language: newsLanguage,
+    country: newsCountry
+  }
+
+  const trendingTopics = await fetchTrendingNews(newsSettings)
   const randomTopic = trendingTopics[Math.floor(Math.random() * trendingTopics.length)]
 
   const content = await generateContentFromNews(

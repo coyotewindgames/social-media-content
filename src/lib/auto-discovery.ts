@@ -22,6 +22,10 @@ export interface AutoDiscoverySettings {
   categories: string[]
   grokApiKey?: string
   ollamaEndpoint?: string
+  newsApiKey?: string
+  gNewsApiKey?: string
+  newsLanguage?: string
+  newsCountry?: string
 }
 
 export const DEFAULT_AUTO_DISCOVERY_SETTINGS: AutoDiscoverySettings = {
@@ -34,6 +38,8 @@ export const DEFAULT_AUTO_DISCOVERY_SETTINGS: AutoDiscoverySettings = {
   maxTopicsPerRun: 5,
   categories: ['Technology', 'Entertainment', 'Lifestyle', 'Health', 'Business', 'Culture'],
   ollamaEndpoint: 'http://localhost:11434',
+  newsLanguage: 'en',
+  newsCountry: 'us',
 }
 
 export async function fetchTrendingTopics(

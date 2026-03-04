@@ -67,7 +67,11 @@ function App() {
           tone: 'casual',
           generateImages: true,
           grokApiKey: autoDiscoverySettings.grokApiKey,
-          ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint
+          ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint,
+          newsApiKey: autoDiscoverySettings.newsApiKey,
+          gNewsApiKey: autoDiscoverySettings.gNewsApiKey,
+          newsLanguage: autoDiscoverySettings.newsLanguage,
+          newsCountry: autoDiscoverySettings.newsCountry
         })
         setDailyContents(daily)
         if (!fromCache) {
@@ -196,7 +200,11 @@ function App() {
           tone: 'casual',
           generateImages: true,
           grokApiKey: autoDiscoverySettings.grokApiKey,
-          ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint
+          ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint,
+          newsApiKey: autoDiscoverySettings.newsApiKey,
+          gNewsApiKey: autoDiscoverySettings.gNewsApiKey,
+          newsLanguage: autoDiscoverySettings.newsLanguage,
+          newsCountry: autoDiscoverySettings.newsCountry
         })
         
         const updated = [...dailyContents]
@@ -222,7 +230,11 @@ function App() {
         tone: 'casual',
         generateImages: true,
         grokApiKey: autoDiscoverySettings.grokApiKey,
-        ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint
+        ollamaEndpoint: autoDiscoverySettings.ollamaEndpoint,
+        newsApiKey: autoDiscoverySettings.newsApiKey,
+        gNewsApiKey: autoDiscoverySettings.gNewsApiKey,
+        newsLanguage: autoDiscoverySettings.newsLanguage,
+        newsCountry: autoDiscoverySettings.newsCountry
       })
       setDailyContents(daily)
       await cacheDailyContent(daily)
