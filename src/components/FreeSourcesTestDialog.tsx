@@ -151,10 +151,13 @@ export function FreeSourcesTestDialog({ open, onClose }: FreeSourcesTestDialogPr
       { name: 'Reddit', fn: testReddit },
     ]
 
+    const results: TestResult[] = []
+
     for (const test of tests) {
       setTestResults(prev => [...prev, { source: test.name, status: 'testing' }])
       
       const result = await test.fn()
+      results.push(result)
       
       setTestResults(prev => 
         prev.map(r => r.source === test.name ? result : r)
@@ -165,7 +168,7 @@ export function FreeSourcesTestDialog({ open, onClose }: FreeSourcesTestDialogPr
 
     setTesting(false)
     
-    const successCount = testResults.filter(r => r.status === 'success').length
+    const successCount = results.filter(r => r.status === 'success').length
     if (successCount === tests.length) {
       toast.success('All free sources tested successfully!')
     } else if (successCount > 0) {
