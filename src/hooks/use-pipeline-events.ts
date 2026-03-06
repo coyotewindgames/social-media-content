@@ -7,6 +7,9 @@ import {
   DEFAULT_SSE_OPTIONS,
 } from '@/lib/pipeline-types';
 
+// Maximum number of events to keep in state to prevent unbounded memory growth
+const MAX_EVENTS = 100;
+
 /**
  * Hook for subscribing to real-time pipeline events via Server-Sent Events (SSE).
  * Provides connection management, automatic reconnection, and event state normalization.
@@ -24,7 +27,10 @@ export function usePipelineEvents(
   jobId: string,
   options: SSEConnectionOptions = {}
 ): PipelineEventState {
-  const mergedOptions = { ...DEFAULT_SSE_OPTIONS, ...options };
+  // Store merged options in a ref to prevent unnecessary re-renders and reconnections
+  const mergedOptionsRef = useRef({ ...DEFAULT_SSE_OPTIONS, ...options });
+  // Update the ref when options change
+  mergedOptionsRef.current = { ...DEFAULT_SSE_OPTIONS, ...options };
   
   const [state, setState] = useState<PipelineEventState>({
     status: 'queued',
@@ -65,7 +71,8 @@ export function usePipelineEvents(
    */
   const handleEvent = useCallback((event: PipelineEvent) => {
     setState((prev) => {
-      const newEvents = [...prev.events, event];
+      // Cap events to prevent unbounded memory growth
+      const newEvents = [...prev.events, event].slice(-MAX_EVENTS);
       
       // Calculate progress based on event or estimate from stage
       let progress = event.progress ?? prev.progress;
@@ -94,6 +101,8 @@ export function usePipelineEvents(
     if (!jobId) {
       return;
     }
+
+    const mergedOptions = mergedOptionsRef.current;
 
     // Clean up existing connection
     if (eventSourceRef.current) {
@@ -134,7 +143,9 @@ export function usePipelineEvents(
         }
       });
 
-      eventSource.addEventListener('error', (event: MessageEvent) => {
+      // Use a non-reserved event name for pipeline errors to avoid
+      // conflicting with EventSource connection errors
+      eventSource.addEventListener('pipeline_error', (event: MessageEvent) => {
         const pipelineEvent = parseEvent(event.data);
         if (pipelineEvent) {
           handleEvent({
@@ -189,7 +200,7 @@ export function usePipelineEvents(
       }));
       mergedOptions.onError?.(error);
     }
-  }, [jobId, mergedOptions, parseEvent, handleEvent]);
+  }, [jobId, parseEvent, handleEvent]);
 
   /**
    * Disconnect from the SSE endpoint.

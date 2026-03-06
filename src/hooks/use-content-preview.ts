@@ -14,15 +14,43 @@ const previewCache = new Map<string, { preview: ContentPreview; timestamp: numbe
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const EVICTION_INTERVAL = CACHE_TTL;
 
-// Periodically remove expired entries to prevent unbounded growth of the cache.
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, value] of previewCache) {
-    if (now - value.timestamp > CACHE_TTL) {
-      previewCache.delete(key);
-    }
+// Reference counting for cache eviction interval management
+let cacheUsersCount = 0;
+let evictionIntervalId: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Start the cache eviction interval if not already running.
+ */
+function startCacheEviction() {
+  cacheUsersCount++;
+  if (evictionIntervalId === null) {
+    evictionIntervalId = setInterval(() => {
+      const now = Date.now();
+      for (const [key, value] of previewCache) {
+        if (now - value.timestamp > CACHE_TTL) {
+          // Revoke blob URLs before removing from cache
+          if (value.preview.url?.startsWith('blob:')) {
+            URL.revokeObjectURL(value.preview.url);
+          }
+          previewCache.delete(key);
+        }
+      }
+    }, EVICTION_INTERVAL);
   }
-}, EVICTION_INTERVAL);
+}
+
+/**
+ * Stop the cache eviction interval if no more users.
+ */
+function stopCacheEviction() {
+  cacheUsersCount--;
+  if (cacheUsersCount <= 0 && evictionIntervalId !== null) {
+    clearInterval(evictionIntervalId);
+    evictionIntervalId = null;
+    cacheUsersCount = 0;
+  }
+}
+
 /**
  * Hook for fetching and caching content previews.
  * Supports multiple content types including text, images, audio, video, and JSON.
@@ -54,12 +82,19 @@ export function useContentPreview(
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Track blob URLs so we can revoke them on cleanup
+  const blobUrlRef = useRef<string | null>(null);
 
   /**
    * Fetch content preview from the API.
    */
   const fetchPreview = useCallback(async () => {
     if (!contentId) {
+      // Revoke previous blob URL if any
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
       setState((prev) => ({
         ...prev,
         preview: null,
@@ -107,11 +142,18 @@ export function useContentPreview(
       let content: string;
       let previewData: ContentPreview;
 
+      // Revoke previous blob URL before creating a new one
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+
       // Handle different content types
       if (detectedType === 'image') {
         // For images, use the URL directly or convert to data URL
         const blob = await response.blob();
         content = URL.createObjectURL(blob);
+        blobUrlRef.current = content; // Track for cleanup
         previewData = {
           id: contentId,
           type: 'image',
@@ -124,6 +166,7 @@ export function useContentPreview(
         // For audio/video, use blob URL
         const blob = await response.blob();
         content = URL.createObjectURL(blob);
+        blobUrlRef.current = content; // Track for cleanup
         previewData = {
           id: contentId,
           type: detectedType,
@@ -193,6 +236,14 @@ export function useContentPreview(
     await fetchPreview();
   }, [contentId, fetchPreview]);
 
+  // Start cache eviction on mount, stop on unmount (reference counting)
+  useEffect(() => {
+    startCacheEviction();
+    return () => {
+      stopCacheEviction();
+    };
+  }, []);
+
   // Fetch on mount and when contentId changes
   useEffect(() => {
     fetchPreview();
@@ -200,6 +251,11 @@ export function useContentPreview(
     return () => {
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      // Revoke blob URL on unmount to prevent memory leaks
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
     };
   }, [fetchPreview]);
