@@ -1,0 +1,17 @@
+{
+  "postsPerNewsItem": 1,
+  "imagesPerPost": 1,
+  "maxPostsPerRun": 10,
+  "enabledPlatforms": ["twitter", "linkedin", "instagram", "facebook"],
+  "defaultTone": "professional",
+  "scheduleEnabled": true,
+  "scheduleIntervalHours": 6,
+  "optimalPostingTimes": ["09:00", "12:00", "17:00", "20:00"],
+  "staggerDelaySeconds": 30,
+  "blockedKeywords": [],
+  "requiredKeywords": [],
+  "contentCategories": ["technology", "business", "news"],
+  "dryRunMode": false,
+  "requireApproval": false,
+  "enableAnalytics": true
+}

@@ -1,0 +1,366 @@
+/**
+ * Content Generation Agent - Creates social media posts using LLMs.
+ */
+
+import { v4 as uuidv4 } from 'uuid';
+import { BaseAgent } from './baseAgent';
+import { Config } from '../config';
+import { NewsItem, SocialPost, Platform, Tone, PLATFORM_LIMITS, createSocialPost } from '../models';
+import { RateLimiter, retryWithBackoff } from '../utils';
+
+// Template fallbacks for when LLM is unavailable
+const TEMPLATE_POSTS: Record<Tone, string[]> = {
+  [Tone.CASUAL]: [
+    'Check this out! {topic} 🔥 {hashtags}',
+    'Just saw this and had to share: {topic} 👀 {hashtags}',
+    'This is wild - {topic} 🚀 {hashtags}',
+  ],
+  [Tone.PROFESSIONAL]: [
+    'Key insight: {topic}. Learn more about how this impacts our industry. {hashtags}',
+    'Important development: {topic}. Here\'s what you need to know. {hashtags}',
+    'Industry update: {topic}. Stay informed. {hashtags}',
+  ],
+  [Tone.PLAYFUL]: [
+    'POV: You just discovered {topic} 😎 {hashtags}',
+    'When you realize {topic} changes everything 🤯 {hashtags}',
+    'Okay but can we talk about {topic}? 💭 {hashtags}',
+  ],
+  [Tone.INSPIRATIONAL]: [
+    'The future is being shaped by {topic}. Be part of the change. ✨ {hashtags}',
+    'Innovation at its finest: {topic}. What possibilities do you see? 🌟 {hashtags}',
+    'Dreaming big starts with understanding {topic}. Let\'s explore! 💡 {hashtags}',
+  ],
+  [Tone.INFORMATIVE]: [
+    'Did you know? {topic}. Here are the key facts. 📊 {hashtags}',
+    'Breaking down {topic}: What you need to understand. 📚 {hashtags}',
+    'Quick explainer: {topic}. Stay informed. 📝 {hashtags}',
+  ],
+};
+
+export class ContentAgent extends BaseAgent {
+  private config: Config;
+  private useOpenAI: boolean;
+  private useAnthropic: boolean;
+
+  constructor(config: Config, rateLimiter?: RateLimiter) {
+    super('content_agent', rateLimiter);
+    this.config = config;
+    this.useOpenAI = !!config.openaiApiKey;
+    this.useAnthropic = !!config.anthropicApiKey;
+  }
+
+  async execute(
+    newsItems: NewsItem[],
+    platforms?: Platform[],
+    tone: Tone = Tone.PROFESSIONAL,
+    postsPerItem = 1
+  ): Promise<SocialPost[]> {
+    const targetPlatforms = platforms ?? Object.values(Platform);
+
+    this.logger.info(
+      `Generating posts for ${newsItems.length} news items across ${targetPlatforms.length} platforms`
+    );
+
+    const allPosts: SocialPost[] = [];
+
+    for (const newsItem of newsItems.slice(0, 10)) {
+      for (const platform of targetPlatforms) {
+        try {
+          const posts = await this.generatePosts(newsItem, platform, tone, postsPerItem);
+          allPosts.push(...posts);
+        } catch (e) {
+          this.logger.error(`Error generating post: ${e}`);
+          // Fallback to templates
+          const post = this.generateTemplatePost(newsItem, platform, tone);
+          allPosts.push(post);
+        }
+      }
+    }
+
+    this.logger.info(`Generated ${allPosts.length} posts`);
+    return allPosts;
+  }
+
+  private async generatePosts(
+    newsItem: NewsItem,
+    platform: Platform,
+    tone: Tone,
+    count: number
+  ): Promise<SocialPost[]> {
+    if (this.useOpenAI) {
+      return this.generateWithOpenAI(newsItem, platform, tone, count);
+    } else if (this.useAnthropic) {
+      return this.generateWithAnthropic(newsItem, platform, tone, count);
+    } else {
+      // Fallback to templates
+      return Array.from({ length: count }, () =>
+        this.generateTemplatePost(newsItem, platform, tone)
+      );
+    }
+  }
+
+  private async generateWithOpenAI(
+    newsItem: NewsItem,
+    platform: Platform,
+    tone: Tone,
+    count: number
+  ): Promise<SocialPost[]> {
+    if (!(await this.rateLimiter.acquire('openai'))) {
+      this.logger.warn('OpenAI rate limited, using templates');
+      return [this.generateTemplatePost(newsItem, platform, tone)];
+    }
+
+    const limits = PLATFORM_LIMITS[platform];
+
+    const systemPrompt = `You are a social media content expert. Generate engaging ${platform} posts.
+
+Rules:
+- Maximum ${limits.maxChars} characters
+- Maximum ${limits.maxHashtags} hashtags
+- Tone: ${tone}
+- Include a call-to-action when appropriate
+- Make content platform-appropriate
+
+For each post, also provide an image prompt that could be used with DALL-E to generate a relevant image.`;
+
+    const userPrompt = `Create ${count} unique ${platform} post(s) about this news:
+
+Topic: ${newsItem.topic}
+Summary: ${newsItem.summary}
+Keywords: ${newsItem.keywords.join(', ')}
+
+Respond in JSON format:
+{
+    "posts": [
+        {
+            "content": "The post text with hashtags",
+            "hashtags": ["hashtag1", "hashtag2"],
+            "image_prompt": "DALL-E prompt for generating an image",
+            "call_to_action": "Optional CTA text"
+        }
+    ]
+}`;
+
+    return retryWithBackoff(
+      async () => {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.config.openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4',
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userPrompt },
+            ],
+            temperature: 0.7,
+            response_format: { type: 'json_object' },
+          }),
+          signal: AbortSignal.timeout(60000),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json() as {
+          choices?: Array<{ message?: { content?: string } }>;
+        };
+        const content = data.choices?.[0]?.message?.content ?? '{}';
+        const parsed = JSON.parse(content) as {
+          posts?: Array<{
+            content?: string;
+            hashtags?: string[];
+            image_prompt?: string;
+            call_to_action?: string;
+          }>;
+        };
+
+        const posts: SocialPost[] = [];
+        for (const postData of parsed.posts ?? []) {
+          const post = createSocialPost({
+            postId: uuidv4(),
+            content: postData.content ?? '',
+            platform,
+            hashtags: postData.hashtags ?? [],
+            imagePrompt: postData.image_prompt,
+            tone,
+            callToAction: postData.call_to_action,
+            newsSource: newsItem.url,
+            createdAt: new Date(),
+          });
+
+          // Validate length and truncate if needed
+          if (post.content.length > limits.maxChars) {
+            const truncatedPost = this.truncatePost(post, limits.maxChars);
+            posts.push(truncatedPost);
+          } else {
+            posts.push(post);
+          }
+        }
+
+        return posts;
+      },
+      { maxRetries: 3, baseDelayMs: 2000 }
+    );
+  }
+
+  private async generateWithAnthropic(
+    newsItem: NewsItem,
+    platform: Platform,
+    tone: Tone,
+    count: number
+  ): Promise<SocialPost[]> {
+    if (!(await this.rateLimiter.acquire('anthropic'))) {
+      this.logger.warn('Anthropic rate limited, using templates');
+      return [this.generateTemplatePost(newsItem, platform, tone)];
+    }
+
+    const limits = PLATFORM_LIMITS[platform];
+
+    const prompt = `Generate ${count} unique ${platform} post(s) about this news.
+
+Rules:
+- Maximum ${limits.maxChars} characters
+- Maximum ${limits.maxHashtags} hashtags
+- Tone: ${tone}
+- Include a call-to-action when appropriate
+
+News:
+Topic: ${newsItem.topic}
+Summary: ${newsItem.summary}
+Keywords: ${newsItem.keywords.join(', ')}
+
+Respond in JSON format:
+{
+    "posts": [
+        {
+            "content": "The post text with hashtags",
+            "hashtags": ["hashtag1", "hashtag2"],
+            "image_prompt": "DALL-E prompt for generating an image",
+            "call_to_action": "Optional CTA text"
+        }
+    ]
+}`;
+
+    return retryWithBackoff(
+      async () => {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': this.config.anthropicApiKey!,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-3-sonnet-20240229',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: prompt }],
+          }),
+          signal: AbortSignal.timeout(60000),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Anthropic API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json() as {
+          content?: Array<{ text?: string }>;
+        };
+        const content = data.content?.[0]?.text ?? '';
+
+        // Extract JSON from response
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (!jsonMatch) {
+          throw new Error('No JSON found in response');
+        }
+
+        const parsed = JSON.parse(jsonMatch[0]) as {
+          posts?: Array<{
+            content?: string;
+            hashtags?: string[];
+            image_prompt?: string;
+            call_to_action?: string;
+          }>;
+        };
+
+        const posts: SocialPost[] = [];
+        for (const postData of parsed.posts ?? []) {
+          const post = createSocialPost({
+            postId: uuidv4(),
+            content: postData.content ?? '',
+            platform,
+            hashtags: postData.hashtags ?? [],
+            imagePrompt: postData.image_prompt,
+            tone,
+            callToAction: postData.call_to_action,
+            newsSource: newsItem.url,
+            createdAt: new Date(),
+          });
+
+          if (post.content.length > limits.maxChars) {
+            posts.push(this.truncatePost(post, limits.maxChars));
+          } else {
+            posts.push(post);
+          }
+        }
+
+        return posts;
+      },
+      { maxRetries: 3, baseDelayMs: 2000 }
+    );
+  }
+
+  private generateTemplatePost(newsItem: NewsItem, platform: Platform, tone: Tone): SocialPost {
+    const templates = TEMPLATE_POSTS[tone] ?? TEMPLATE_POSTS[Tone.PROFESSIONAL];
+    const template = templates[Math.floor(Math.random() * templates.length)];
+
+    // Generate hashtags from keywords
+    const hashtags = newsItem.keywords.slice(0, 5).map((kw) => `#${kw.replace(/\s+/g, '')}`);
+    const hashtagsStr = hashtags.join(' ');
+
+    // Format the template
+    const content = template
+      .replace('{topic}', newsItem.topic.slice(0, 100))
+      .replace('{hashtags}', hashtagsStr);
+
+    // Generate simple image prompt
+    const imagePrompt = `Professional illustration representing: ${newsItem.topic.slice(0, 50)}`;
+
+    return createSocialPost({
+      postId: uuidv4(),
+      content,
+      platform,
+      hashtags: hashtags.map((h) => h.replace('#', '')),
+      imagePrompt,
+      tone,
+      newsSource: newsItem.url,
+      createdAt: new Date(),
+    });
+  }
+
+  private truncatePost(post: SocialPost, maxChars: number): SocialPost {
+    if (post.content.length <= maxChars) {
+      return post;
+    }
+
+    // Remove hashtags from content first
+    let content = post.content;
+    for (const hashtag of post.hashtags) {
+      content = content.replace(`#${hashtag}`, '').trim();
+    }
+
+    // Truncate and add ellipsis
+    const truncated = content.slice(0, maxChars - 3).split(' ').slice(0, -1).join(' ') + '...';
+
+    return createSocialPost({
+      ...post,
+      content: truncated,
+      hashtags: post.hashtags.slice(0, 3),
+    });
+  }
+}
