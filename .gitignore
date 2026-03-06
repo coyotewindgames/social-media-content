@@ -54,3 +54,4 @@ venv/
 .venv/
 orchestrator/logs/
 orchestrator/*.db
+*.db

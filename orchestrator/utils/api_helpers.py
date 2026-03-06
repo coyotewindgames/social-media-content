@@ -101,7 +101,13 @@ class ResponseCache:
         self.default_ttl = default_ttl
     
     def _make_key(self, *args, **kwargs) -> str:
-        """Generate cache key from arguments."""
+        """
+        Generate cache key from arguments.
+        
+        Note: MD5 is used here only for fast hashing of cache keys,
+        not for security purposes. This is acceptable as cache keys
+        don't require cryptographic strength.
+        """
         # Convert non-serializable objects to their string representation
         def make_serializable(obj):
             try:

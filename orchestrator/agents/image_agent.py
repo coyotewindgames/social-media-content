@@ -247,14 +247,15 @@ class ImageAgent(BaseAgent):
                 
                 data = await response.json()
                 
-                # Stability returns base64, we'd need to upload to get URL
-                # For simplicity, using a placeholder approach
+                # Stability returns base64 image data
                 image_data = data["artifacts"][0]
+                base64_data = image_data["base64"]
                 
-                # In production, you would upload this to cloud storage
-                # and return the actual URL
+                # Return complete data URL with full base64 encoding
+                # In production, you may want to upload this to cloud storage
+                # (e.g., S3, GCS) and return that URL instead for better performance
                 return GeneratedImage(
-                    url=f"data:image/png;base64,{image_data['base64'][:100]}...",
+                    url=f"data:image/png;base64,{base64_data}",
                     format="png",
                     dimensions=dimensions,
                     alt_text=prompt[:200],
@@ -281,10 +282,14 @@ class ImageAgent(BaseAgent):
         index: int = 0,
     ) -> GeneratedImage:
         """Get a stock image as fallback."""
+        from urllib.parse import urlparse
+        
         stock_url = STOCK_IMAGE_FALLBACKS[index % len(STOCK_IMAGE_FALLBACKS)]
         
-        # Add dimension parameters if Unsplash URL
-        if "unsplash.com" in stock_url:
+        # Add dimension parameters for Unsplash URLs
+        # Using proper URL parsing to validate the domain
+        parsed = urlparse(stock_url)
+        if parsed.netloc == "images.unsplash.com":
             stock_url = f"{stock_url}&h={dimensions.height}&w={dimensions.width}&fit=crop"
         
         return GeneratedImage(

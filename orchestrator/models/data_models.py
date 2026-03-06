@@ -68,12 +68,18 @@ class SocialPost(BaseModel):
         object.__setattr__(self, 'character_count', len(self.content))
     
     def validate_length(self) -> bool:
-        """Validate post length against platform limits."""
+        """
+        Validate post length against platform limits.
+        
+        Note: These are the maximum technical limits. For optimal engagement,
+        shorter posts are recommended (e.g., Twitter: 280 max but 100-150 optimal,
+        Facebook: 63,206 max but 40-80 optimal for engagement).
+        """
         limits = {
             Platform.TWITTER: 280,
             Platform.LINKEDIN: 3000,
             Platform.INSTAGRAM: 2200,
-            Platform.FACEBOOK: 63206,
+            Platform.FACEBOOK: 63206,  # Facebook's actual technical limit
             Platform.TIKTOK: 2200,
         }
         return len(self.content) <= limits.get(self.platform, 280)
