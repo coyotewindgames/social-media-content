@@ -32,3 +32,13 @@ pids
 .devcontainer/
 
 .spark-workbench-id
+
+# SQLite databases
+*.db
+
+# Orchestrator Node.js
+orchestrator-node/dist/
+orchestrator-node/node_modules/
+orchestrator-node/coverage/
+orchestrator-node/logs/
+orchestrator-node/*.db
