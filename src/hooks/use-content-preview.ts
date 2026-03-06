@@ -12,7 +12,17 @@ import {
  */
 const previewCache = new Map<string, { preview: ContentPreview; timestamp: number }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const EVICTION_INTERVAL = CACHE_TTL;
 
+// Periodically remove expired entries to prevent unbounded growth of the cache.
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of previewCache) {
+    if (now - value.timestamp > CACHE_TTL) {
+      previewCache.delete(key);
+    }
+  }
+}, EVICTION_INTERVAL);
 /**
  * Hook for fetching and caching content previews.
  * Supports multiple content types including text, images, audio, video, and JSON.
