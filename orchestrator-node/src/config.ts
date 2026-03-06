@@ -150,9 +150,10 @@ export function loadConfig(configFile?: string): Config {
   if (configPath && fs.existsSync(configPath)) {
     try {
       const fileConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      // Merge non-credential settings
+      // Merge non-credential settings using a pattern to identify sensitive keys
+      const credentialPattern = /Key$|Token$|Secret$|^supabase/i;
       for (const [key, value] of Object.entries(fileConfig)) {
-        if (!key.includes('Key') && !key.includes('Token') && !key.includes('Secret') && !key.includes('Id') && !key.includes('Url')) {
+        if (!credentialPattern.test(key)) {
           (config as unknown as Record<string, unknown>)[key] = value;
         }
       }

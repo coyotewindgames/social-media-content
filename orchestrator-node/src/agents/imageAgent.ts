@@ -4,7 +4,7 @@
 
 import { BaseAgent } from './baseAgent';
 import { Config } from '../config';
-import { SocialPost, ImageSet, GeneratedImage, ImageDimensions, Platform, PLATFORM_DIMENSIONS } from '../models';
+import { SocialPost, ImageSet, GeneratedImage, ImageDimensions, PLATFORM_DIMENSIONS } from '../models';
 import { RateLimiter, retryWithBackoff } from '../utils';
 
 // Stock image URLs for fallback

@@ -196,7 +196,7 @@ async function main(): Promise<void> {
 async function runPipeline(
   orchestrator: Orchestrator,
   options: RunOptions,
-  logger: ReturnType<typeof getLogger>
+  _logger: ReturnType<typeof getLogger>
 ): Promise<void> {
   console.log('\nStarting content pipeline...\n');
 

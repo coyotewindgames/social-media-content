@@ -109,7 +109,7 @@ export class PublishAgent extends BaseAgent {
     return result;
   }
 
-  private async publishTwitter(post: SocialPost, images?: ImageSet): Promise<PublishResult> {
+  private async publishTwitter(post: SocialPost, _images?: ImageSet): Promise<PublishResult> {
     if (!this.config.twitterAccessToken) {
       return {
         postId: post.postId,
@@ -175,7 +175,7 @@ export class PublishAgent extends BaseAgent {
     );
   }
 
-  private async publishLinkedIn(post: SocialPost, images?: ImageSet): Promise<PublishResult> {
+  private async publishLinkedIn(post: SocialPost, _images?: ImageSet): Promise<PublishResult> {
     if (!this.config.linkedinAccessToken) {
       return {
         postId: post.postId,
@@ -425,7 +425,7 @@ export class PublishAgent extends BaseAgent {
     }
   }
 
-  private async publishTikTok(post: SocialPost, images?: ImageSet): Promise<PublishResult> {
+  private async publishTikTok(post: SocialPost, _images?: ImageSet): Promise<PublishResult> {
     // TikTok's Content Posting API has limited availability
     return {
       postId: post.postId,

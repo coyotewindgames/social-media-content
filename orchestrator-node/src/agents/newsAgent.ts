@@ -5,7 +5,7 @@
 import { BaseAgent } from './baseAgent';
 import { Config } from '../config';
 import { NewsItem } from '../models';
-import { RateLimiter, retryWithBackoff, globalCache, makeApiRequest } from '../utils';
+import { RateLimiter, retryWithBackoff, globalCache } from '../utils';
 
 // Stopwords for keyword extraction
 const STOPWORDS = new Set([
