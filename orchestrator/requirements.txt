@@ -1,0 +1,25 @@
+# Social Media Content Orchestrator
+# Production Dependencies
+
+# Core async HTTP client
+aiohttp>=3.9.0,<4.0.0
+
+# Pydantic for data validation
+pydantic>=2.5.0,<3.0.0
+
+# Database ORM
+sqlalchemy>=2.0.0,<3.0.0
+
+# Scheduling
+apscheduler>=3.10.0,<4.0.0
+
+# Environment variables (optional, for development)
+python-dotenv>=1.0.0,<2.0.0
+
+# Development Dependencies (optional)
+# pytest>=7.4.0
+# pytest-asyncio>=0.21.0
+# pytest-cov>=4.1.0
+# black>=23.0.0
+# ruff>=0.1.0
+# mypy>=1.7.0

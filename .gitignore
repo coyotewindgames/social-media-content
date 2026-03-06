@@ -32,3 +32,25 @@ pids
 .devcontainer/
 
 .spark-workbench-id
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+venv/
+.venv/
+orchestrator/logs/
+orchestrator/*.db
