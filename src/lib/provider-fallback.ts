@@ -148,8 +148,8 @@ export function detectErrorType(
     }
   }
 
-  // Check for AbortError (timeout)
-  if (error instanceof DOMException && error.name === 'AbortError') {
+  // Check for AbortError (timeout) - works in both browser and Node.js
+  if (error instanceof Error && error.name === 'AbortError') {
     return ProviderErrorType.TIMEOUT;
   }
 
