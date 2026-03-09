@@ -10,6 +10,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/main.ts",
+    "serve": "ts-node src/server.ts",
     "start": "node dist/main.js",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -36,11 +37,15 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
     "commander": "^13.1.0",
+    "cors": "^2.8.6",
     "dotenv": "^16.5.0",
+    "express": "^5.2.1",
     "node-cron": "^4.0.7",
     "uuid": "^11.1.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.15.23",
     "@types/node-cron": "^3.0.11",

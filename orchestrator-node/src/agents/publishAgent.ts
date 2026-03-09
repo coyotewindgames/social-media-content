@@ -2,6 +2,7 @@
  * Publishing Agent - Posts content to social media platforms.
  */
 
+import * as crypto from 'crypto';
 import { BaseAgent } from './baseAgent';
 import { Config } from '../config';
 import { SocialPost, ImageSet, PublishResult, PublishStatus, Platform } from '../models';
@@ -136,13 +137,13 @@ export class PublishAgent extends BaseAgent {
           text: post.content,
         };
 
-        // Note: Media upload requires additional implementation
-        // This is a simplified version
+        const url = 'https://api.twitter.com/2/tweets';
+        const authHeader = this.buildOAuth1Header('POST', url);
 
-        const response = await fetch('https://api.twitter.com/2/tweets', {
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${this.config.twitterAccessToken}`,
+            Authorization: authHeader,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(tweetData),
@@ -459,5 +460,55 @@ export class PublishAgent extends BaseAgent {
 
   clearManualReviewQueue(): void {
     this.manualReviewQueue = [];
+  }
+
+  /**
+   * Build an OAuth 1.0a Authorization header for Twitter API v2.
+   */
+  private buildOAuth1Header(method: string, url: string): string {
+    const consumerKey = this.config.twitterApiKey!;
+    const consumerSecret = this.config.twitterApiSecret!;
+    const accessToken = this.config.twitterAccessToken!;
+    const accessSecret = this.config.twitterAccessSecret!;
+
+    const oauthParams: Record<string, string> = {
+      oauth_consumer_key: consumerKey,
+      oauth_nonce: crypto.randomBytes(16).toString('hex'),
+      oauth_signature_method: 'HMAC-SHA1',
+      oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+      oauth_token: accessToken,
+      oauth_version: '1.0',
+    };
+
+    // Build signature base string
+    const paramString = Object.keys(oauthParams)
+      .sort()
+      .map((k) => `${this.percentEncode(k)}=${this.percentEncode(oauthParams[k])}`)
+      .join('&');
+
+    const baseString = [
+      method.toUpperCase(),
+      this.percentEncode(url),
+      this.percentEncode(paramString),
+    ].join('&');
+
+    const signingKey = `${this.percentEncode(consumerSecret)}&${this.percentEncode(accessSecret)}`;
+    const signature = crypto
+      .createHmac('sha1', signingKey)
+      .update(baseString)
+      .digest('base64');
+
+    oauthParams['oauth_signature'] = signature;
+
+    const header = Object.keys(oauthParams)
+      .sort()
+      .map((k) => `${this.percentEncode(k)}="${this.percentEncode(oauthParams[k])}"`)
+      .join(', ');
+
+    return `OAuth ${header}`;
+  }
+
+  private percentEncode(str: string): string {
+    return encodeURIComponent(str).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   }
 }

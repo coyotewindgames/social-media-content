@@ -6,7 +6,7 @@
  */
 
 export { Orchestrator, type PipelineResult, type RunOptions } from './orchestrator';
-export { Config, loadConfig, validateConfig, maskSecrets } from './config';
+export { type Config, loadConfig, validateConfig, maskSecrets } from './config';
 export {
   Platform,
   Tone,
@@ -42,3 +42,15 @@ export {
   retryWithBackoff,
   makeApiRequest,
 } from './utils';
+export {
+  Provider,
+  ProviderErrorType,
+  ProviderError,
+  type GenerationOptions,
+  type ProviderResult,
+  generateWithFallback,
+  detectErrorType,
+  shouldFallback,
+  testProviderConnection,
+  getAvailableProviders,
+} from './providerFallback';

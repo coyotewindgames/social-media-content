@@ -44,10 +44,12 @@ export class NewsAgent extends BaseAgent {
     // Reddit (always available - public API)
     tasks.push(this.fetchReddit(keywords));
 
-    // Twitter/X (if configured)
-    if (this.config.twitterBearerToken) {
-      tasks.push(this.fetchTwitterTrends());
-    }
+    // Twitter/X search requires a paid Basic or Pro API tier ($100+/mo).
+    // The free tier returns 402, so this source is disabled by default.
+    // Uncomment if you have a paid plan:
+    // if (this.config.twitterBearerToken) {
+    //   tasks.push(this.fetchTwitterTrends());
+    // }
 
     // Hacker News (always available - public API)
     tasks.push(this.fetchHackerNews());
@@ -76,7 +78,7 @@ export class NewsAgent extends BaseAgent {
     const filteredNews = this.applyFilters(allNews, keywords);
 
     this.logger.info(`Retrieved ${filteredNews.length} news items`);
-    return filteredNews.slice(0, 20);
+    return filteredNews.slice(0, 5);
   }
 
   private async fetchNewsApi(keywords?: string[]): Promise<NewsItem[]> {
@@ -203,62 +205,62 @@ export class NewsAgent extends BaseAgent {
     return newsItems;
   }
 
-  private async fetchTwitterTrends(): Promise<NewsItem[]> {
-    const cacheKey = globalCache.makeKey('twitter_trends');
-    const cached = globalCache.get<NewsItem[]>(cacheKey);
-    if (cached) return cached;
+  // private async fetchTwitterTrends(): Promise<NewsItem[]> {
+  //   const cacheKey = globalCache.makeKey('twitter_trends');
+  //   const cached = globalCache.get<NewsItem[]>(cacheKey);
+  //   if (cached) return cached;
 
-    if (!(await this.rateLimiter.acquire('twitter'))) {
-      this.logger.warn('Twitter rate limited');
-      return [];
-    }
+  //   if (!(await this.rateLimiter.acquire('twitter'))) {
+  //     this.logger.warn('Twitter rate limited');
+  //     return [];
+  //   }
 
-    try {
-      const url = new URL('https://api.twitter.com/2/tweets/search/recent');
-      url.searchParams.set('query', 'trending OR viral -is:retweet');
-      url.searchParams.set('max_results', '20');
-      url.searchParams.set('tweet.fields', 'created_at,public_metrics');
+  //   try {
+  //     const url = new URL('https://api.twitter.com/2/tweets/search/recent');
+  //     url.searchParams.set('query', 'trending OR viral -is:retweet');
+  //     url.searchParams.set('max_results', '20');
+  //     url.searchParams.set('tweet.fields', 'created_at,public_metrics');
 
-      const response = await fetch(url.toString(), {
-        headers: {
-          Authorization: `Bearer ${this.config.twitterBearerToken}`,
-        },
-        signal: AbortSignal.timeout(30000),
-      });
+  //     const response = await fetch(url.toString(), {
+  //       headers: {
+  //         Authorization: `Bearer ${this.config.twitterBearerToken}`,
+  //       },
+  //       signal: AbortSignal.timeout(30000),
+  //     });
 
-      if (!response.ok) {
-        this.logger.error(`Twitter API error: ${response.status}`);
-        return [];
-      }
+  //     if (!response.ok) {
+  //       this.logger.error(`Twitter API error: ${response.status}`);
+  //       return [];
+  //     }
 
-      const data = await response.json() as {
-        data?: Array<{
-          id?: string;
-          text?: string;
-          created_at?: string;
-        }>;
-      };
+  //     const data = await response.json() as {
+  //       data?: Array<{
+  //         id?: string;
+  //         text?: string;
+  //         created_at?: string;
+  //       }>;
+  //     };
 
-      const newsItems: NewsItem[] = [];
-      for (const tweet of data.data ?? []) {
-        newsItems.push({
-          topic: (tweet.text ?? '').slice(0, 100),
-          source: 'Twitter/X',
-          url: `https://twitter.com/i/web/status/${tweet.id ?? ''}`,
-          summary: tweet.text ?? '',
-          keywords: this.extractKeywords(tweet.text ?? ''),
-          timestamp: tweet.created_at ? new Date(tweet.created_at) : new Date(),
-          relevanceScore: 0.7,
-        });
-      }
+  //     const newsItems: NewsItem[] = [];
+  //     for (const tweet of data.data ?? []) {
+  //       newsItems.push({
+  //         topic: (tweet.text ?? '').slice(0, 100),
+  //         source: 'Twitter/X',
+  //         url: `https://twitter.com/i/web/status/${tweet.id ?? ''}`,
+  //         summary: tweet.text ?? '',
+  //         keywords: this.extractKeywords(tweet.text ?? ''),
+  //         timestamp: tweet.created_at ? new Date(tweet.created_at) : new Date(),
+  //         relevanceScore: 0.7,
+  //       });
+  //     }
 
-      globalCache.set(cacheKey, newsItems, 300000);
-      return newsItems;
-    } catch (e) {
-      this.logger.error(`Twitter fetch error: ${e}`);
-      return [];
-    }
-  }
+  //     globalCache.set(cacheKey, newsItems, 300000);
+  //     return newsItems;
+  //   } catch (e) {
+  //     this.logger.error(`Twitter fetch error: ${e}`);
+  //     return [];
+  //   }
+  // }
 
   private async fetchHackerNews(): Promise<NewsItem[]> {
     const cacheKey = globalCache.makeKey('hackernews');

@@ -63,7 +63,7 @@ export class ContentAgent extends BaseAgent {
 
     const allPosts: SocialPost[] = [];
 
-    for (const newsItem of newsItems.slice(0, 10)) {
+    for (const newsItem of newsItems.slice(0, 3)) {
       for (const platform of targetPlatforms) {
         try {
           const posts = await this.generatePosts(newsItem, platform, tone, postsPerItem);
@@ -88,14 +88,22 @@ export class ContentAgent extends BaseAgent {
     count: number
   ): Promise<SocialPost[]> {
     if (this.useOpenAI) {
-      return this.generateWithOpenAI(newsItem, platform, tone, count);
+      try {
+        return await this.generateWithOpenAI(newsItem, platform, tone, count);
+      } catch (e) {
+        this.logger.warn(`OpenAI failed after retries: ${e}. Falling back to Ollama.`);
+        return this.generateWithOllama(newsItem, platform, tone, count);
+      }
     } else if (this.useAnthropic) {
-      return this.generateWithAnthropic(newsItem, platform, tone, count);
+      try {
+        return await this.generateWithAnthropic(newsItem, platform, tone, count);
+      } catch (e) {
+        this.logger.warn(`Anthropic failed after retries: ${e}. Falling back to Ollama.`);
+        return this.generateWithOllama(newsItem, platform, tone, count);
+      }
     } else {
-      // Fallback to templates
-      return Array.from({ length: count }, () =>
-        this.generateTemplatePost(newsItem, platform, tone)
-      );
+      // No cloud LLM configured, try Ollama first then templates
+      return this.generateWithOllama(newsItem, platform, tone, count);
     }
   }
 
@@ -150,7 +158,7 @@ Respond in JSON format:
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4',
+            model: 'gpt-4o-mini',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt },
@@ -313,6 +321,113 @@ Respond in JSON format:
       },
       { maxRetries: 3, baseDelayMs: 2000 }
     );
+  }
+
+  private async generateWithOllama(
+    newsItem: NewsItem,
+    platform: Platform,
+    tone: Tone,
+    count: number
+  ): Promise<SocialPost[]> {
+    const endpoint = this.config.ollamaEndpoint || 'http://localhost:11434';
+    const model = this.config.ollamaModel || 'llama3.2';
+    const limits = PLATFORM_LIMITS[platform];
+
+    const prompt = `You are a social media content expert. Generate ${count} unique ${platform} post(s).
+
+Rules:
+- Maximum ${limits.maxChars} characters
+- Maximum ${limits.maxHashtags} hashtags
+- Tone: ${tone}
+- Include a call-to-action when appropriate
+
+News:
+Topic: ${newsItem.topic}
+Summary: ${newsItem.summary}
+Keywords: ${newsItem.keywords.join(', ')}
+
+Respond ONLY with valid JSON, no other text:
+{
+    "posts": [
+        {
+            "content": "The post text with hashtags",
+            "hashtags": ["hashtag1", "hashtag2"],
+            "image_prompt": "DALL-E prompt for generating an image",
+            "call_to_action": "Optional CTA text"
+        }
+    ]
+}`;
+
+    try {
+      this.logger.info(`Attempting Ollama generation with model '${model}' at ${endpoint}`);
+
+      const response = await fetch(`${endpoint}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model,
+          prompt,
+          stream: false,
+          options: { temperature: 0.7 },
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Ollama API error: ${response.status}`);
+      }
+
+      const data = await response.json() as { response?: string };
+      const rawText = data.response ?? '';
+
+      // Extract JSON from response
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No JSON found in Ollama response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]) as {
+        posts?: Array<{
+          content?: string;
+          hashtags?: string[];
+          image_prompt?: string;
+          call_to_action?: string;
+        }>;
+      };
+
+      const posts: SocialPost[] = [];
+      for (const postData of parsed.posts ?? []) {
+        const post = createSocialPost({
+          postId: uuidv4(),
+          content: postData.content ?? '',
+          platform,
+          hashtags: postData.hashtags ?? [],
+          imagePrompt: postData.image_prompt,
+          tone,
+          callToAction: postData.call_to_action,
+          newsSource: newsItem.url,
+          createdAt: new Date(),
+        });
+
+        if (post.content.length > limits.maxChars) {
+          posts.push(this.truncatePost(post, limits.maxChars));
+        } else {
+          posts.push(post);
+        }
+      }
+
+      if (posts.length > 0) {
+        this.logger.info(`Ollama generated ${posts.length} posts successfully`);
+        return posts;
+      }
+
+      throw new Error('Ollama returned no posts');
+    } catch (e) {
+      this.logger.warn(`Ollama fallback failed: ${e}. Using templates.`);
+      return Array.from({ length: count }, () =>
+        this.generateTemplatePost(newsItem, platform, tone)
+      );
+    }
   }
 
   private generateTemplatePost(newsItem: NewsItem, platform: Platform, tone: Tone): SocialPost {

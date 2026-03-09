@@ -254,7 +254,7 @@ export class Orchestrator {
 
       // Fallback: Generate template-based posts
       const posts: SocialPost[] = [];
-      for (const newsItem of this.currentPipeline!.newsItems.slice(0, 10)) {
+      for (const newsItem of this.currentPipeline!.newsItems.slice(0, 3)) {
         for (const platform of platforms) {
           posts.push(this.generateTemplatePost(newsItem, platform, tone));
         }
