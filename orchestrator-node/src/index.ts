@@ -42,3 +42,15 @@ export {
   retryWithBackoff,
   makeApiRequest,
 } from './utils';
+export {
+  Provider,
+  ProviderErrorType,
+  ProviderError,
+  type GenerationOptions,
+  type ProviderResult,
+  generateWithFallback,
+  detectErrorType,
+  shouldFallback,
+  testProviderConnection,
+  getAvailableProviders,
+} from './providerFallback';
