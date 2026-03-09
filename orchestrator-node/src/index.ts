@@ -6,7 +6,7 @@
  */
 
 export { Orchestrator, type PipelineResult, type RunOptions } from './orchestrator';
-export { Config, loadConfig, validateConfig, maskSecrets } from './config';
+export { type Config, loadConfig, validateConfig, maskSecrets } from './config';
 export {
   Platform,
   Tone,

@@ -38,6 +38,10 @@ export interface Config {
   // Stability AI (for Stable Diffusion)
   stabilityApiKey?: string;
 
+  // Ollama (local LLM fallback)
+  ollamaEndpoint?: string;
+  ollamaModel?: string;
+
   // Reddit API (optional for authenticated requests)
   redditClientId?: string;
   redditClientSecret?: string;
@@ -131,6 +135,8 @@ export function loadConfig(configFile?: string): Config {
   config.openaiApiKey = process.env.OPENAI_API_KEY;
   config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   config.stabilityApiKey = process.env.STABILITY_API_KEY;
+  config.ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
+  config.ollamaModel = process.env.OLLAMA_MODEL || 'llama3.2';
   config.redditClientId = process.env.REDDIT_CLIENT_ID;
   config.redditClientSecret = process.env.REDDIT_CLIENT_SECRET;
 

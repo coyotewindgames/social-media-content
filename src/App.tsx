@@ -7,11 +7,9 @@ import { ContentDialog } from '@/components/ContentDialog'
 import { EmptyState } from '@/components/EmptyState'
 import { AccountsDialog } from '@/components/AccountsDialog'
 import { PublishDialog } from '@/components/PublishDialog'
-import { TrendingTopicsDialog } from '@/components/TrendingTopicsDialog'
 import { AutoDiscoverySettingsDialog } from '@/components/AutoDiscoverySettingsDialog'
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard'
 import { AccountComparisonDialog } from '@/components/AccountComparisonDialog'
-import { FreeSourcesTestDialog } from '@/components/FreeSourcesTestDialog'
 import { useAutoDiscovery } from '@/hooks/use-auto-discovery'
 import { getOrGenerateDailyContent, regenerateDailyContent, cacheDailyContent, generateDailyContent } from '@/lib/daily-content-generator'
 import { Button } from '@/components/ui/button'
@@ -26,7 +24,7 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Badge } from '@/components/ui/badge'
-import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, TrendUp, Gear, Bell, ChartLine, Scales, ArrowsClockwise, TestTube } from '@phosphor-icons/react'
+import { Plus, List, CalendarBlank, MagnifyingGlass, Sparkle, User, Gear, Bell, ChartLine, Scales, ArrowsClockwise } from '@phosphor-icons/react'
 import { Calendar } from '@/components/ui/calendar'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, Toaster } from 'sonner'
@@ -39,11 +37,9 @@ function App() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [accountsDialogOpen, setAccountsDialogOpen] = useState(false)
   const [publishDialogOpen, setPublishDialogOpen] = useState(false)
-  const [trendingDialogOpen, setTrendingDialogOpen] = useState(false)
   const [autoDiscoverySettingsOpen, setAutoDiscoverySettingsOpen] = useState(false)
   const [analyticsDialogOpen, setAnalyticsDialogOpen] = useState(false)
   const [comparisonDialogOpen, setComparisonDialogOpen] = useState(false)
-  const [freeSourcesTestOpen, setFreeSourcesTestOpen] = useState(false)
   const [contentToPublish, setContentToPublish] = useState<ContentIdea | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [platformFilter, setPlatformFilter] = useState<Platform | 'all'>('all')
@@ -275,65 +271,6 @@ Requirements:
     return captions
   }
 
-  const handleGenerateFromTrending = async (
-    topics: Array<{ topic: string; category: string; relevance: string; contentAngle: string }>,
-    platform: Platform,
-    tone: CaptionTone
-  ) => {
-    toast.promise(
-      (async () => {
-        const newContents: ContentIdea[] = []
-
-        for (const topic of topics) {
-          const prompt = window.spark.llmPrompt`You are a social media content strategist. Create a compelling content idea for ${platform} based on this trending topic:
-
-Topic: ${topic.topic}
-Category: ${topic.category}
-Why it's trending: ${topic.relevance}
-Content angle: ${topic.contentAngle}
-Tone: ${tone}
-
-Generate:
-1. A catchy title (5-10 words)
-2. A brief description (2-3 sentences) of what the content would show
-3. An engaging ${tone} caption with emojis and relevant hashtags
-
-Return ONLY valid JSON:
-{
-  "title": "Title here",
-  "description": "Description here",
-  "caption": "Caption here"
-}`
-
-          const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
-          const data = JSON.parse(response)
-
-          const newContent: ContentIdea = {
-            id: `content-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            title: data.title || topic.topic,
-            description: data.description || topic.contentAngle,
-            caption: data.caption || '',
-            platform,
-            status: 'idea',
-            notes: `Generated from trending topic: ${topic.topic}\n\nRelevance: ${topic.relevance}`,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          }
-
-          newContents.push(newContent)
-        }
-
-        setContents((currentContents) => [...(currentContents || []), ...newContents])
-        return newContents.length
-      })(),
-      {
-        loading: 'Generating content ideas from trending topics...',
-        success: (count) => `${count} content idea${count !== 1 ? 's' : ''} created!`,
-        error: 'Failed to generate content ideas',
-      }
-    )
-  }
-
   const filteredContents = useMemo(() => {
     const safeContents = contents || []
     return safeContents.filter((content) => {
@@ -386,15 +323,6 @@ Return ONLY valid JSON:
             </div>
             <div className="flex items-center gap-3">
               <Button
-                onClick={() => setFreeSourcesTestOpen(true)}
-                variant="outline"
-                size="lg"
-                className="border-green-500/50 text-green-600 hover:bg-green-500/10"
-              >
-                <TestTube size={20} weight="duotone" className="mr-2" />
-                Test Sources
-              </Button>
-              <Button
                 onClick={() => setComparisonDialogOpen(true)}
                 variant="outline"
                 size="lg"
@@ -411,15 +339,6 @@ Return ONLY valid JSON:
               >
                 <ChartLine size={20} weight="duotone" className="mr-2" />
                 Analytics
-              </Button>
-              <Button
-                onClick={() => setTrendingDialogOpen(true)}
-                variant="outline"
-                size="lg"
-                className="border-accent/50 text-accent hover:bg-accent/10"
-              >
-                <TrendUp size={20} weight="duotone" className="mr-2" />
-                Discover Trends
               </Button>
               <Button
                 onClick={() => setAutoDiscoverySettingsOpen(true)}
@@ -445,14 +364,6 @@ Return ONLY valid JSON:
               >
                 <User size={20} weight="duotone" className="mr-2" />
                 Accounts
-              </Button>
-              <Button
-                onClick={handleCreateNew}
-                size="lg"
-                className="bg-gradient-to-r from-accent to-primary text-white hover:opacity-90 transition-opacity"
-              >
-                <Plus size={20} weight="bold" className="mr-2" />
-                New Content
               </Button>
             </div>
           </div>
@@ -683,12 +594,6 @@ Return ONLY valid JSON:
         onPublished={handlePublished}
       />
 
-      <TrendingTopicsDialog
-        open={trendingDialogOpen}
-        onClose={() => setTrendingDialogOpen(false)}
-        onGenerateContent={handleGenerateFromTrending}
-      />
-
       <AutoDiscoverySettingsDialog
         open={autoDiscoverySettingsOpen}
         onClose={() => setAutoDiscoverySettingsOpen(false)}
@@ -704,11 +609,6 @@ Return ONLY valid JSON:
       <AccountComparisonDialog
         open={comparisonDialogOpen}
         onClose={() => setComparisonDialogOpen(false)}
-      />
-
-      <FreeSourcesTestDialog
-        open={freeSourcesTestOpen}
-        onClose={() => setFreeSourcesTestOpen(false)}
       />
     </div>
   )

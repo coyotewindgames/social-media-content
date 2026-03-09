@@ -6,6 +6,7 @@
 import { Command } from 'commander';
 import * as cron from 'node-cron';
 import * as dotenv from 'dotenv';
+import { execSync, spawn } from 'child_process';
 import { Orchestrator, RunOptions } from './orchestrator';
 import { loadConfig } from './config';
 import { Platform, Tone } from './models';
@@ -46,6 +47,77 @@ program.parse();
 
 const options = program.opts();
 
+async function ensureOllamaRunning(endpoint: string, model: string): Promise<void> {
+  const logger = getLogger('ollama-startup');
+
+  // Check if Ollama is already reachable
+  try {
+    const res = await fetch(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      logger.info('Ollama is already running');
+      await ensureModelPulled(endpoint, model, logger);
+      return;
+    }
+  } catch {
+    // Not running yet — attempt to start it
+  }
+
+  logger.info('Ollama not detected. Attempting to start ollama serve...');
+  console.log('Starting Ollama in the background...');
+
+  // Start ollama serve as a detached background process
+  const child = spawn('ollama', ['serve'], {
+    detached: true,
+    stdio: 'ignore',
+    shell: true,
+  });
+  child.unref();
+
+  // Wait for it to become reachable (up to 15 seconds)
+  for (let i = 0; i < 15; i++) {
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      const res = await fetch(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        logger.info('Ollama started successfully');
+        console.log('Ollama is ready.');
+        await ensureModelPulled(endpoint, model, logger);
+        return;
+      }
+    } catch {
+      // Still starting up
+    }
+  }
+
+  logger.warn('Could not start Ollama automatically. Ollama fallback will be unavailable.');
+  console.warn('Warning: Could not start Ollama. Install it from https://ollama.com if you want local LLM fallback.');
+}
+
+async function ensureModelPulled(endpoint: string, model: string, logger: ReturnType<typeof getLogger>): Promise<void> {
+  try {
+    const res = await fetch(`${endpoint}/api/tags`, { signal: AbortSignal.timeout(5000) });
+    if (res.ok) {
+      const data = await res.json() as { models?: Array<{ name: string }> };
+      const available = data.models?.map((m) => m.name) ?? [];
+      if (available.some((n) => n.startsWith(model))) {
+        logger.info(`Model '${model}' is available`);
+        return;
+      }
+
+      logger.info(`Model '${model}' not found locally. Pulling...`);
+      console.log(`Pulling Ollama model '${model}'... (this may take a few minutes on first run)`);
+      try {
+        execSync(`ollama pull ${model}`, { stdio: 'inherit', timeout: 600000 });
+        logger.info(`Model '${model}' pulled successfully`);
+      } catch (e) {
+        logger.warn(`Failed to pull model '${model}': ${e}`);
+      }
+    }
+  } catch {
+    // Can't check models, skip
+  }
+}
+
 async function main(): Promise<void> {
   const config = loadConfig(options.config);
   
@@ -55,6 +127,11 @@ async function main(): Promise<void> {
   });
 
   const logger = getLogger('main');
+
+  // Ensure Ollama is running for local LLM fallback
+  const ollamaEndpoint = config.ollamaEndpoint || 'http://localhost:11434';
+  const ollamaModel = config.ollamaModel || 'llama3.2';
+  await ensureOllamaRunning(ollamaEndpoint, ollamaModel);
 
   // Create orchestrator
   const orchestrator = new Orchestrator(config);
