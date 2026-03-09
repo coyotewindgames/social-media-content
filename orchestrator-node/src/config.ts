@@ -85,7 +85,7 @@ const defaultConfig: Config = {
   // Pipeline settings
   postsPerNewsItem: 1,
   imagesPerPost: 1,
-  maxPostsPerRun: 10,
+  maxPostsPerRun: 3,
 
   // Scheduling settings
   scheduleEnabled: true,
@@ -94,7 +94,7 @@ const defaultConfig: Config = {
   staggerDelaySeconds: 30,
 
   // Platform preferences
-  enabledPlatforms: ['twitter', 'linkedin', 'instagram', 'facebook'],
+  enabledPlatforms: ['twitter'],
   defaultTone: 'professional',
 
   // Content filters

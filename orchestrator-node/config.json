@@ -1,8 +1,8 @@
 {
   "postsPerNewsItem": 1,
   "imagesPerPost": 1,
-  "maxPostsPerRun": 10,
-  "enabledPlatforms": ["twitter", "linkedin", "instagram", "facebook"],
+  "maxPostsPerRun": 3,
+  "enabledPlatforms": ["twitter"],
   "defaultTone": "professional",
   "scheduleEnabled": true,
   "scheduleIntervalHours": 6,

@@ -53,57 +53,68 @@ export class ContentAgent extends BaseAgent {
     newsItems: NewsItem[],
     platforms?: Platform[],
     tone: Tone = Tone.PROFESSIONAL,
-    postsPerItem = 1
+    _postsPerItem = 1
   ): Promise<SocialPost[]> {
     const targetPlatforms = platforms ?? Object.values(Platform);
+    const maxPosts = this.config.maxPostsPerRun || 3;
+    // Use up to maxPosts distinct news items so each post covers a different story
+    const selectedNews = newsItems.slice(0, maxPosts);
 
     this.logger.info(
-      `Generating posts for ${newsItems.length} news items across ${targetPlatforms.length} platforms`
+      `Generating ${maxPosts} unique posts from ${selectedNews.length} news items`
     );
 
     const allPosts: SocialPost[] = [];
 
-    for (const newsItem of newsItems.slice(0, 10)) {
-      for (const platform of targetPlatforms) {
-        try {
-          const posts = await this.generatePosts(newsItem, platform, tone, postsPerItem);
-          allPosts.push(...posts);
-        } catch (e) {
-          this.logger.error(`Error generating post: ${e}`);
-          // Fallback to templates
-          const post = this.generateTemplatePost(newsItem, platform, tone);
-          allPosts.push(post);
-        }
+    for (let i = 0; i < selectedNews.length && allPosts.length < maxPosts; i++) {
+      const newsItem = selectedNews[i];
+      // Round-robin across platforms so each post targets a different one
+      const platform = targetPlatforms[i % targetPlatforms.length];
+      try {
+        const posts = await this.generatePosts(newsItem, platform, tone, 1, allPosts);
+        allPosts.push(...posts.slice(0, 1));
+      } catch (e) {
+        this.logger.error(`Error generating post: ${e}`);
+        const post = this.generateTemplatePost(newsItem, platform, tone);
+        allPosts.push(post);
       }
     }
 
-    this.logger.info(`Generated ${allPosts.length} posts`);
-    return allPosts;
+    this.logger.info(`Generated ${allPosts.length} unique posts`);
+    return allPosts.slice(0, maxPosts);
+  }
+
+  private buildPriorPostsContext(priorPosts: SocialPost[]): string {
+    if (priorPosts.length === 0) return '';
+    const summaries = priorPosts.map((p, i) =>
+      `Post ${i + 1} (${p.platform}): ${p.content.slice(0, 120)}`
+    ).join('\n');
+    return `\n\nIMPORTANT — Posts already generated in this run (DO NOT repeat similar topics, angles, or phrasing):\n${summaries}\n\nMake your post substantially different in topic focus, angle, and wording from the above.`;
   }
 
   private async generatePosts(
     newsItem: NewsItem,
     platform: Platform,
     tone: Tone,
-    count: number
+    count: number,
+    priorPosts: SocialPost[] = []
   ): Promise<SocialPost[]> {
     if (this.useOpenAI) {
       try {
-        return await this.generateWithOpenAI(newsItem, platform, tone, count);
+        return await this.generateWithOpenAI(newsItem, platform, tone, count, priorPosts);
       } catch (e) {
         this.logger.warn(`OpenAI failed after retries: ${e}. Falling back to Ollama.`);
-        return this.generateWithOllama(newsItem, platform, tone, count);
+        return this.generateWithOllama(newsItem, platform, tone, count, priorPosts);
       }
     } else if (this.useAnthropic) {
       try {
-        return await this.generateWithAnthropic(newsItem, platform, tone, count);
+        return await this.generateWithAnthropic(newsItem, platform, tone, count, priorPosts);
       } catch (e) {
         this.logger.warn(`Anthropic failed after retries: ${e}. Falling back to Ollama.`);
-        return this.generateWithOllama(newsItem, platform, tone, count);
+        return this.generateWithOllama(newsItem, platform, tone, count, priorPosts);
       }
     } else {
-      // No cloud LLM configured, try Ollama first then templates
-      return this.generateWithOllama(newsItem, platform, tone, count);
+      return this.generateWithOllama(newsItem, platform, tone, count, priorPosts);
     }
   }
 
@@ -111,7 +122,8 @@ export class ContentAgent extends BaseAgent {
     newsItem: NewsItem,
     platform: Platform,
     tone: Tone,
-    count: number
+    count: number,
+    priorPosts: SocialPost[] = []
   ): Promise<SocialPost[]> {
     if (!(await this.rateLimiter.acquire('openai'))) {
       this.logger.warn('OpenAI rate limited, using templates');
@@ -119,15 +131,17 @@ export class ContentAgent extends BaseAgent {
     }
 
     const limits = PLATFORM_LIMITS[platform];
+    const priorContext = this.buildPriorPostsContext(priorPosts);
 
     const systemPrompt = `You are a social media content expert. Generate engaging ${platform} posts.
 
 Rules:
 - Maximum ${limits.maxChars} characters
-- Maximum ${limits.maxHashtags} hashtags
+- Maximum ${5} hashtags
 - Tone: ${tone}
 - Include a call-to-action when appropriate
 - Make content platform-appropriate
+- Each post must have a unique angle — never repeat a topic or style already used
 
 For each post, also provide an image prompt that could be used with DALL-E to generate a relevant image.`;
 
@@ -135,7 +149,7 @@ For each post, also provide an image prompt that could be used with DALL-E to ge
 
 Topic: ${newsItem.topic}
 Summary: ${newsItem.summary}
-Keywords: ${newsItem.keywords.join(', ')}
+Keywords: ${newsItem.keywords.join(', ')}${priorContext}
 
 Respond in JSON format:
 {
@@ -198,6 +212,7 @@ Respond in JSON format:
             tone,
             callToAction: postData.call_to_action,
             newsSource: newsItem.url,
+            generatedBy: 'gpt-4o-mini',
             createdAt: new Date(),
           });
 
@@ -220,7 +235,8 @@ Respond in JSON format:
     newsItem: NewsItem,
     platform: Platform,
     tone: Tone,
-    count: number
+    count: number,
+    priorPosts: SocialPost[] = []
   ): Promise<SocialPost[]> {
     if (!(await this.rateLimiter.acquire('anthropic'))) {
       this.logger.warn('Anthropic rate limited, using templates');
@@ -228,19 +244,21 @@ Respond in JSON format:
     }
 
     const limits = PLATFORM_LIMITS[platform];
+    const priorContext = this.buildPriorPostsContext(priorPosts);
 
     const prompt = `Generate ${count} unique ${platform} post(s) about this news.
 
 Rules:
 - Maximum ${limits.maxChars} characters
-- Maximum ${limits.maxHashtags} hashtags
+- Maximum ${5} hashtags
 - Tone: ${tone}
 - Include a call-to-action when appropriate
+- Each post must have a unique angle — never repeat a topic or style already used
 
 News:
 Topic: ${newsItem.topic}
 Summary: ${newsItem.summary}
-Keywords: ${newsItem.keywords.join(', ')}
+Keywords: ${newsItem.keywords.join(', ')}${priorContext}
 
 Respond in JSON format:
 {
@@ -307,6 +325,7 @@ Respond in JSON format:
             tone,
             callToAction: postData.call_to_action,
             newsSource: newsItem.url,
+            generatedBy: 'claude-3-sonnet',
             createdAt: new Date(),
           });
 
@@ -327,24 +346,27 @@ Respond in JSON format:
     newsItem: NewsItem,
     platform: Platform,
     tone: Tone,
-    count: number
+    count: number,
+    priorPosts: SocialPost[] = []
   ): Promise<SocialPost[]> {
     const endpoint = this.config.ollamaEndpoint || 'http://localhost:11434';
     const model = this.config.ollamaModel || 'llama3.2';
     const limits = PLATFORM_LIMITS[platform];
+    const priorContext = this.buildPriorPostsContext(priorPosts);
 
     const prompt = `You are a social media content expert. Generate ${count} unique ${platform} post(s).
 
 Rules:
 - Maximum ${limits.maxChars} characters
-- Maximum ${limits.maxHashtags} hashtags
+- Maximum ${5} hashtags
 - Tone: ${tone}
 - Include a call-to-action when appropriate
+- Each post must have a unique angle — never repeat a topic or style already used
 
 News:
 Topic: ${newsItem.topic}
 Summary: ${newsItem.summary}
-Keywords: ${newsItem.keywords.join(', ')}
+Keywords: ${newsItem.keywords.join(', ')}${priorContext}
 
 Respond ONLY with valid JSON, no other text:
 {
@@ -406,6 +428,7 @@ Respond ONLY with valid JSON, no other text:
           tone,
           callToAction: postData.call_to_action,
           newsSource: newsItem.url,
+          generatedBy: `ollama/${model}`,
           createdAt: new Date(),
         });
 
@@ -454,6 +477,7 @@ Respond ONLY with valid JSON, no other text:
       imagePrompt,
       tone,
       newsSource: newsItem.url,
+      generatedBy: 'template',
       createdAt: new Date(),
     });
   }
