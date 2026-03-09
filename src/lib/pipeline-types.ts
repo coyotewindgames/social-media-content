@@ -121,12 +121,15 @@ export const STAGE_LABELS: Record<PipelineStage, string> = {
  * Helper to determine content type from MIME type.
  */
 export function getContentTypeFromMime(mimeType: string): ContentType {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType === 'application/json') return 'json';
-  if (mimeType === 'text/markdown') return 'markdown';
-  if (mimeType === 'text/html') return 'html';
+  // Normalize by splitting on ';' to handle parameters like charset
+  const baseMimeType = mimeType.split(';', 1)[0].trim();
+
+  if (baseMimeType.startsWith('image/')) return 'image';
+  if (baseMimeType.startsWith('audio/')) return 'audio';
+  if (baseMimeType.startsWith('video/')) return 'video';
+  if (baseMimeType === 'application/json') return 'json';
+  if (baseMimeType === 'text/markdown') return 'markdown';
+  if (baseMimeType === 'text/html') return 'html';
   return 'text';
 }
 

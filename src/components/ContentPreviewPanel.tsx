@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { ContentPreview, ContentType } from '@/lib/pipeline-types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -158,34 +159,119 @@ function VideoPreview({ url, className }: { url: string; className?: string }) {
 
 /**
  * JSON preview component with syntax highlighting.
+ * Uses React elements instead of dangerouslySetInnerHTML to avoid XSS.
  */
 function JsonPreview({ content, className }: { content: string; className?: string }) {
-  // Apply basic syntax highlighting
+  // Apply basic syntax highlighting without using dangerouslySetInnerHTML
   const highlightedJson = useMemo(() => {
-    return content
-      .replace(/"([^"]+)":/g, '<span class="text-blue-600 dark:text-blue-400">"$1"</span>:')
-      .replace(/: "([^"]+)"/g, ': <span class="text-green-600 dark:text-green-400">"$1"</span>')
-      .replace(/: (\d+)/g, ': <span class="text-orange-600 dark:text-orange-400">$1</span>')
-      .replace(/: (true|false|null)/g, ': <span class="text-purple-600 dark:text-purple-400">$1</span>');
+    // Try to pretty-print JSON if possible
+    let jsonString = content;
+    try {
+      const parsed = JSON.parse(content);
+      jsonString = JSON.stringify(parsed, null, 2);
+    } catch {
+      // If parsing fails, fall back to the original content
+    }
+
+    const lines = jsonString.split('\n');
+
+    return lines.map((line, lineIndex) => {
+      const elements: React.ReactNode[] = [];
+
+      // Preserve indentation
+      const indentMatch = line.match(/^(\s*)(.*)$/);
+      const indent = indentMatch ? indentMatch[1] : '';
+      const rest = indentMatch ? indentMatch[2] : line;
+
+      if (indent) {
+        elements.push(<span key="indent">{indent}</span>);
+      }
+
+      // Match "key": value pattern
+      const keyValueMatch = rest.match(/^(".*?")( *:)?(.*)$/);
+
+      if (!keyValueMatch) {
+        elements.push(<span key="rest">{rest}</span>);
+      } else {
+        const [, key, colon = '', value = ''] = keyValueMatch;
+
+        // Key
+        elements.push(
+          <span key="key" className="text-blue-600 dark:text-blue-400">
+            {key}
+          </span>
+        );
+
+        // Colon (and any surrounding spaces)
+        if (colon) {
+          elements.push(<span key="colon">{colon}</span>);
+        }
+
+        // Value (if any)
+        if (value) {
+          const trimmed = value.trim();
+          let valueElement: React.ReactNode;
+
+          if (/^".*"$/.test(trimmed)) {
+            // String value
+            valueElement = (
+              <span key="string" className="text-green-600 dark:text-green-400">
+                {value}
+              </span>
+            );
+          } else if (/^\d+(\.\d+)?$/.test(trimmed)) {
+            // Number value
+            valueElement = (
+              <span key="number" className="text-orange-600 dark:text-orange-400">
+                {value}
+              </span>
+            );
+          } else if (/^(true|false|null)[,}]?$/.test(trimmed)) {
+            // Boolean/null (optionally followed by , or })
+            valueElement = (
+              <span key="literal" className="text-purple-600 dark:text-purple-400">
+                {value}
+              </span>
+            );
+          } else {
+            // Fallback for punctuation/braces/etc.
+            valueElement = <span key="value">{value}</span>;
+          }
+
+          elements.push(valueElement);
+        }
+      }
+
+      return (
+        <span key={lineIndex}>
+          {elements}
+          {'\n'}
+        </span>
+      );
+    });
   }, [content]);
 
   return (
-    <pre 
+    <pre
       className={cn(
         'whitespace-pre-wrap break-words font-mono text-sm p-4 bg-muted rounded-md overflow-x-auto',
         className
       )}
-      dangerouslySetInnerHTML={{ __html: highlightedJson }}
-    />
+    >
+      {highlightedJson}
+    </pre>
   );
 }
 
 /**
  * Markdown preview component.
+ * Sanitizes HTML output using DOMPurify to prevent XSS.
  */
 function MarkdownPreview({ content, className }: { content: string; className?: string }) {
   const html = useMemo(() => {
-    return marked.parse(content, { async: false }) as string;
+    const rawHtml = marked.parse(content, { async: false }) as string;
+    // Sanitize the HTML to prevent XSS attacks
+    return DOMPurify.sanitize(rawHtml);
   }, [content]);
 
   return (
@@ -201,9 +287,13 @@ function MarkdownPreview({ content, className }: { content: string; className?: 
 
 /**
  * HTML preview component with iframe sandbox.
+ * Uses strict sandboxing for security - no same-origin access to prevent
+ * access to parent window storage/cookies.
  */
 function HtmlPreview({ content, className }: { content: string; className?: string }) {
   const srcDoc = useMemo(() => {
+    // Sanitize content before rendering
+    const sanitizedContent = DOMPurify.sanitize(content);
     // Add basic styling to the HTML
     return `
       <!DOCTYPE html>
@@ -219,7 +309,7 @@ function HtmlPreview({ content, className }: { content: string; className?: stri
             }
           </style>
         </head>
-        <body>${content}</body>
+        <body>${sanitizedContent}</body>
       </html>
     `;
   }, [content]);
@@ -227,7 +317,7 @@ function HtmlPreview({ content, className }: { content: string; className?: stri
   return (
     <iframe
       srcDoc={srcDoc}
-      sandbox="allow-same-origin"
+      sandbox="allow-popups allow-popups-to-escape-sandbox"
       className={cn('w-full min-h-48 border rounded-md bg-white', className)}
       title="HTML Preview"
     />
