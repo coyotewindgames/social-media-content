@@ -78,7 +78,7 @@ export class NewsAgent extends BaseAgent {
     const filteredNews = this.applyFilters(allNews, keywords);
 
     this.logger.info(`Retrieved ${filteredNews.length} news items`);
-    return filteredNews.slice(0, 5);
+    return filteredNews.slice(0, 3);
   }
 
   private async fetchNewsApi(keywords?: string[]): Promise<NewsItem[]> {

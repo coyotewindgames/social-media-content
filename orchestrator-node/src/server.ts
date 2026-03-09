@@ -80,6 +80,7 @@ function rowToSummary(row: PipelineRunRow) {
     newsCount: news.length,
     publishCount: publish.length,
     errors,
+    dryRun: row.dry_run,
     agentStatuses: row.agent_statuses as Record<string, string>,
   };
 }
@@ -168,8 +169,10 @@ app.post('/api/pipeline/run', (req, res) => {
     keywords: body.keywords,
     platforms,
     tone,
-    dryRun: body.dryRun ?? false,
+    dryRun: body.dryRun === true,
   };
+
+  logger.info(`Pipeline run requested: dryRun=${runOptions.dryRun} (raw=${body.dryRun})`);
 
   // Generate a temporary ID; the real pipelineId comes from the orchestrator
   const tempId = `run-${Date.now()}`;
@@ -221,6 +224,17 @@ app.get('/api/pipeline/status/:id', async (req, res) => {
   // Check in-memory first (active/recently completed)
   const record = activeRuns.get(req.params.id);
   if (record) {
+    // For running pipelines, pull live agent statuses from the orchestrator
+    if (record.status === 'running') {
+      const live = orchestrator.getCurrentPipelineStatus();
+      if (live) {
+        record.agentStatuses = live.agentStatuses;
+        // Also update the record's real pipeline ID once available
+        if (live.id !== record.id && !activeRuns.has(live.id)) {
+          record.id = live.id;
+        }
+      }
+    }
     res.json(record);
     return;
   }
@@ -245,7 +259,7 @@ app.get('/api/pipeline/status/:id', async (req, res) => {
 // ─── List all runs ───────────────────────────────────────────────────────────
 
 app.get('/api/pipeline/runs', async (req, res) => {
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 500);
   const seenIds = new Set<string>();
   const allRuns: ReturnType<typeof rowToSummary>[] = [];
 
@@ -261,6 +275,7 @@ app.get('/api/pipeline/runs', async (req, res) => {
       newsCount: record.result?.newsItems.length ?? 0,
       publishCount: record.result?.publishResults.length ?? 0,
       errors: record.errors,
+      dryRun: record.options.dryRun ?? false,
       agentStatuses: record.agentStatuses,
     });
   }

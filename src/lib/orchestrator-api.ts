@@ -72,6 +72,8 @@ export interface RunSummary {
   postCount: number
   newsCount: number
   publishCount: number
+  dryRun?: boolean
+  agentStatuses?: Record<string, string>
 }
 
 export interface ConfigStatus {

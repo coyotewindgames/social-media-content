@@ -399,6 +399,15 @@ export function PipelineDashboard() {
     return () => clearInterval(interval)
   }, [refreshStatus])
 
+  // Auto-resume polling if a pipeline is still running (e.g., after page refresh)
+  useEffect(() => {
+    if (activeRunId) return
+    const runningRun = runs.find((r) => r.status === 'running')
+    if (runningRun) {
+      setActiveRunId(runningRun.id)
+    }
+  }, [runs, activeRunId])
+
   // ─── Poll active run ────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -409,6 +418,16 @@ export function PipelineDashboard() {
       while (!cancelled) {
         try {
           const status = await getPipelineStatus(activeRunId)
+
+          // Update the runs list with latest agent statuses
+          if (status.agentStatuses) {
+            setRuns((prev) =>
+              prev.map((r) =>
+                r.id === activeRunId ? { ...r, agentStatuses: status.agentStatuses } : r
+              )
+            )
+          }
+
           if (status.status !== 'running') {
             try {
               const finalId = status.id !== activeRunId ? status.id : activeRunId
@@ -632,24 +651,34 @@ export function PipelineDashboard() {
       </Card>
 
       {/* ── Active run progress ── */}
-      {activeRunId && (
-        <Card className="border-blue-500/30">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CircleNotch size={20} className="animate-spin text-blue-500" />
-              Pipeline Running
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <AgentStep label="Fetching News" icon={Newspaper} status="running" />
-              <AgentStep label="Generating Content" icon={Lightning} status="pending" />
-              <AgentStep label="Creating Images" icon={ImageSquare} status="pending" />
-              <AgentStep label="Publishing" icon={PaperPlaneTilt} status="pending" />
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {activeRunId && (() => {
+        const activeRun = runs.find((r) => r.id === activeRunId)
+        const agentStatus = (agent: string): 'pending' | 'running' | 'success' | 'failed' | undefined => {
+          const s = activeRun?.agentStatuses?.[agent]
+          if (s === 'running') return 'running'
+          if (s === 'success') return 'success'
+          if (s === 'failed') return 'failed'
+          return 'pending'
+        }
+        return (
+          <Card className="border-blue-500/30">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CircleNotch size={20} className="animate-spin text-blue-500" />
+                Pipeline Running
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                <AgentStep label="Fetching News" icon={Newspaper} status={agentStatus('news_agent')} />
+                <AgentStep label="Generating Content" icon={Lightning} status={agentStatus('content_agent')} />
+                <AgentStep label="Creating Images" icon={ImageSquare} status={agentStatus('image_agent')} />
+                <AgentStep label="Publishing" icon={PaperPlaneTilt} status={agentStatus('publish_agent')} />
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
 
       {/* ── Compare view ── */}
       {comparing && (

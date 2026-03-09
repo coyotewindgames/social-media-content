@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { PipelineDashboard } from '@/components/PipelineDashboard'
+import { RunHistory } from '@/components/RunHistory'
 import { AccountsDialog } from '@/components/AccountsDialog'
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard'
 import { AutoDiscoverySettingsDialog } from '@/components/AutoDiscoverySettingsDialog'
 import { useAutoDiscovery } from '@/hooks/use-auto-discovery'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Lightning, User, Gear, Bell, ChartLine } from '@phosphor-icons/react'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Lightning, User, Gear, Bell, ChartLine, Play, ClockCounterClockwise } from '@phosphor-icons/react'
 import { Toaster } from 'sonner'
 
 function App() {
@@ -73,7 +75,24 @@ function App() {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <PipelineDashboard />
+        <Tabs defaultValue="dashboard">
+          <TabsList className="mb-6">
+            <TabsTrigger value="dashboard" className="gap-1.5">
+              <Play size={16} weight="duotone" />
+              Dashboard
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5">
+              <ClockCounterClockwise size={16} weight="duotone" />
+              Run History
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="dashboard">
+            <PipelineDashboard />
+          </TabsContent>
+          <TabsContent value="history">
+            <RunHistory />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <AccountsDialog open={accountsDialogOpen} onClose={() => setAccountsDialogOpen(false)} />

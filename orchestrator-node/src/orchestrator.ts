@@ -142,6 +142,17 @@ export class Orchestrator {
     process.on('SIGTERM', () => shutdown('SIGTERM'));
   }
 
+  /** Get the current pipeline's live status (used by the API server for polling). */
+  getCurrentPipelineStatus(): { id: string; agentStatuses: Record<string, string> } | null {
+    if (!this.currentPipeline) return null;
+    return {
+      id: this.currentPipeline.pipelineId,
+      agentStatuses: Object.fromEntries(
+        Object.entries(this.currentPipeline.agentStatuses).map(([k, v]) => [k, String(v)])
+      ),
+    };
+  }
+
   /**
    * Run the complete content pipeline.
    */
@@ -252,12 +263,12 @@ export class Orchestrator {
       this.currentPipeline!.errorLog.push(`Content agent error (using templates): ${errorMessage}`);
       logger.warn(`Content agent failed, using template fallback: ${errorMessage}`);
 
-      // Fallback: Generate template-based posts
+      // Fallback: Generate template-based posts (one per news item, round-robin platforms)
       const posts: SocialPost[] = [];
-      for (const newsItem of this.currentPipeline!.newsItems.slice(0, 3)) {
-        for (const platform of platforms) {
-          posts.push(this.generateTemplatePost(newsItem, platform, tone));
-        }
+      const selectedNews = this.currentPipeline!.newsItems.slice(0, this.config.maxPostsPerRun || 3);
+      for (let i = 0; i < selectedNews.length; i++) {
+        const platform = platforms[i % platforms.length];
+        posts.push(this.generateTemplatePost(selectedNews[i], platform, tone));
       }
       this.currentPipeline!.posts = posts;
       this.currentPipeline!.agentStatuses['content_agent'] = AgentStatus.SUCCESS;
