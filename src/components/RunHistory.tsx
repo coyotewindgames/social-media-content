@@ -61,6 +61,11 @@ function PostCard({ post, imageSet }: { post: SocialPost; imageSet?: ImageSet })
         <div className="flex items-center gap-1.5 flex-wrap">
           <Badge className={PLATFORM_COLORS[post.platform] || ''} >{post.platform}</Badge>
           <Badge variant="outline" className="text-xs capitalize">{post.tone}</Badge>
+          {post.generatedBy && (
+            <Badge variant="outline" className="text-xs bg-violet-500/10 text-violet-600 border-violet-500/20">
+              {post.generatedBy}
+            </Badge>
+          )}
         </div>
         <p className="text-sm leading-relaxed whitespace-pre-wrap line-clamp-4">{post.content}</p>
         {post.hashtags.length > 0 && (

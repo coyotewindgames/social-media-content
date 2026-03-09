@@ -28,6 +28,7 @@ export interface SocialPost {
   callToAction?: string
   characterCount: number
   newsSource?: string
+  generatedBy?: string
   createdAt: string
 }
 
@@ -63,6 +64,15 @@ export interface PipelineResult {
   errors: string[]
 }
 
+export interface PartialResults {
+  newsCount: number
+  postCount: number
+  imageCount: number
+  publishCount: number
+  newsTopics: string[]
+  postPreviews: { platform: string; content: string; generatedBy?: string }[]
+}
+
 export interface RunSummary {
   id: string
   status: 'running' | 'completed' | 'failed'
@@ -74,6 +84,7 @@ export interface RunSummary {
   publishCount: number
   dryRun?: boolean
   agentStatuses?: Record<string, string>
+  partialResults?: PartialResults
 }
 
 export interface ConfigStatus {

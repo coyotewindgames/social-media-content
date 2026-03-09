@@ -212,6 +212,7 @@ Respond in JSON format:
             tone,
             callToAction: postData.call_to_action,
             newsSource: newsItem.url,
+            generatedBy: 'gpt-4o-mini',
             createdAt: new Date(),
           });
 
@@ -249,7 +250,7 @@ Respond in JSON format:
 
 Rules:
 - Maximum ${limits.maxChars} characters
-- Maximum ${limits.maxHashtags} hashtags
+- Maximum ${5} hashtags
 - Tone: ${tone}
 - Include a call-to-action when appropriate
 - Each post must have a unique angle — never repeat a topic or style already used
@@ -324,6 +325,7 @@ Respond in JSON format:
             tone,
             callToAction: postData.call_to_action,
             newsSource: newsItem.url,
+            generatedBy: 'claude-3-sonnet',
             createdAt: new Date(),
           });
 
@@ -356,7 +358,7 @@ Respond in JSON format:
 
 Rules:
 - Maximum ${limits.maxChars} characters
-- Maximum ${limits.maxHashtags} hashtags
+- Maximum ${5} hashtags
 - Tone: ${tone}
 - Include a call-to-action when appropriate
 - Each post must have a unique angle — never repeat a topic or style already used
@@ -426,6 +428,7 @@ Respond ONLY with valid JSON, no other text:
           tone,
           callToAction: postData.call_to_action,
           newsSource: newsItem.url,
+          generatedBy: `ollama/${model}`,
           createdAt: new Date(),
         });
 
@@ -474,6 +477,7 @@ Respond ONLY with valid JSON, no other text:
       imagePrompt,
       tone,
       newsSource: newsItem.url,
+      generatedBy: 'template',
       createdAt: new Date(),
     });
   }

@@ -143,13 +143,36 @@ export class Orchestrator {
   }
 
   /** Get the current pipeline's live status (used by the API server for polling). */
-  getCurrentPipelineStatus(): { id: string; agentStatuses: Record<string, string> } | null {
+  getCurrentPipelineStatus(): {
+    id: string;
+    agentStatuses: Record<string, string>;
+    partialResults: {
+      newsCount: number;
+      postCount: number;
+      imageCount: number;
+      publishCount: number;
+      newsTopics: string[];
+      postPreviews: { platform: string; content: string; generatedBy?: string }[];
+    };
+  } | null {
     if (!this.currentPipeline) return null;
     return {
       id: this.currentPipeline.pipelineId,
       agentStatuses: Object.fromEntries(
         Object.entries(this.currentPipeline.agentStatuses).map(([k, v]) => [k, String(v)])
       ),
+      partialResults: {
+        newsCount: this.currentPipeline.newsItems.length,
+        postCount: this.currentPipeline.posts.length,
+        imageCount: this.currentPipeline.imageSets.length,
+        publishCount: this.currentPipeline.publishResults.length,
+        newsTopics: this.currentPipeline.newsItems.map((n) => n.topic.slice(0, 80)),
+        postPreviews: this.currentPipeline.posts.map((p) => ({
+          platform: p.platform,
+          content: p.content.slice(0, 120),
+          generatedBy: p.generatedBy,
+        })),
+      },
     };
   }
 

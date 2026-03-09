@@ -60,6 +60,7 @@ export interface SocialPost {
   callToAction?: string;
   characterCount: number;
   newsSource?: string;
+  generatedBy?: string;
   createdAt: Date;
 }
 

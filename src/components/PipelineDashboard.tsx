@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   checkHealth,
   getConfigStatus,
@@ -14,6 +14,7 @@ import {
   type OrchestratorTone,
   type SocialPost,
   type ImageSet,
+  type PartialResults,
 } from '@/lib/orchestrator-api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,6 +51,45 @@ import {
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 
+// ─── Polling hook ────────────────────────────────────────────────────────────
+
+function usePolling<T>(
+  fetcher: () => Promise<T>,
+  interval: number,
+  enabled: boolean,
+): T | null {
+  const [data, setData] = useState<T | null>(null)
+  const fetcherRef = useRef(fetcher)
+  fetcherRef.current = fetcher
+
+  useEffect(() => {
+    if (!enabled) {
+      setData(null)
+      return
+    }
+
+    let mounted = true
+
+    const tick = async () => {
+      try {
+        const result = await fetcherRef.current()
+        if (mounted) setData(result)
+      } catch {
+        // Silently skip — will retry on the next interval
+      }
+    }
+
+    tick()
+    const id = setInterval(tick, interval)
+    return () => {
+      mounted = false
+      clearInterval(id)
+    }
+  }, [enabled, interval])
+
+  return data
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const PLATFORM_COLORS: Record<string, string> = {
@@ -70,30 +110,66 @@ function AgentStep({
   label,
   icon: Icon,
   status,
+  detail,
+  isLast,
 }: {
   label: string
   icon: React.ElementType
   status: 'pending' | 'running' | 'success' | 'failed' | undefined
+  detail?: string
+  isLast?: boolean
 }) {
+  const bgColor =
+    status === 'running'
+      ? 'bg-blue-500/15 ring-2 ring-blue-500/40'
+      : status === 'success'
+        ? 'bg-green-500/15 ring-1 ring-green-500/30'
+        : status === 'failed'
+          ? 'bg-red-500/15 ring-1 ring-red-500/30'
+          : 'bg-muted/50'
+
+  const iconColor =
+    status === 'running'
+      ? 'text-blue-500'
+      : status === 'success'
+        ? 'text-green-500'
+        : status === 'failed'
+          ? 'text-red-500'
+          : 'text-muted-foreground/50'
+
   return (
-    <div className="flex items-center gap-2 py-1.5">
-      <Icon
-        size={18}
-        weight="duotone"
-        className={
-          status === 'running'
-            ? 'text-blue-500 animate-pulse'
-            : status === 'success'
-              ? 'text-green-500'
-              : status === 'failed'
-                ? 'text-red-500'
-                : 'text-muted-foreground'
-        }
-      />
-      <span className="text-sm flex-1">{label}</span>
-      {status === 'running' && <CircleNotch size={14} className="animate-spin text-blue-500" />}
-      {status === 'success' && <CheckCircle size={14} weight="fill" className="text-green-500" />}
-      {status === 'failed' && <XCircle size={14} weight="fill" className="text-red-500" />}
+    <div className="flex items-start gap-3">
+      {/* Icon circle */}
+      <div className="flex flex-col items-center">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${bgColor}`}>
+          {status === 'running' ? (
+            <CircleNotch size={22} className="animate-spin text-blue-500" />
+          ) : status === 'success' ? (
+            <CheckCircle size={22} weight="fill" className="text-green-500" />
+          ) : status === 'failed' ? (
+            <XCircle size={22} weight="fill" className="text-red-500" />
+          ) : (
+            <Icon size={22} weight="duotone" className={iconColor} />
+          )}
+        </div>
+        {!isLast && (
+          <div className={`w-0.5 h-6 mt-1 transition-colors duration-300 ${
+            status === 'success' ? 'bg-green-500/40' : status === 'failed' ? 'bg-red-500/40' : 'bg-border'
+          }`} />
+        )}
+      </div>
+      {/* Text */}
+      <div className="pt-1.5 min-w-0 flex-1">
+        <p className={`text-sm font-medium leading-none ${
+          status === 'running' ? 'text-blue-600' : status === 'success' ? 'text-green-600' : status === 'failed' ? 'text-red-600' : 'text-muted-foreground'
+        }`}>
+          {label}
+          {status === 'running' && <span className="ml-1.5 text-xs font-normal text-blue-400 animate-pulse">in progress…</span>}
+        </p>
+        {detail && (
+          <p className="text-xs text-muted-foreground mt-1 truncate">{detail}</p>
+        )}
+      </div>
     </div>
   )
 }
@@ -104,10 +180,12 @@ function ContentPostCard({
   post,
   imageSet,
   runLabel,
+  compact,
 }: {
   post: SocialPost
   imageSet?: ImageSet
   runLabel?: string
+  compact?: boolean
 }) {
   const image = imageSet?.images?.[0]
   return (
@@ -115,40 +193,45 @@ function ContentPostCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12 }}
-      className="border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow"
+      className={`border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow ${compact ? 'text-[0.8rem]' : ''}`}
     >
       {image && image.url && !image.url.startsWith('data:') && (
         <img
           src={image.url}
           alt={image.altText || 'Generated image'}
-          className="w-full h-44 object-cover"
+          className={`w-full object-cover ${compact ? 'h-28' : 'h-44'}`}
         />
       )}
-      <div className="p-5 space-y-3">
+      <div className={compact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
         {/* Header badges */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge className={PLATFORM_COLORS[post.platform] || ''}>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <Badge className={`${PLATFORM_COLORS[post.platform] || ''} ${compact ? 'text-[10px] px-1.5 py-0' : ''}`}>
             {post.platform}
           </Badge>
-          <Badge variant="outline" className="text-xs capitalize">
+          <Badge variant="outline" className={`capitalize ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
             {post.tone}
           </Badge>
+          {post.generatedBy && (
+            <Badge variant="outline" className={`bg-violet-500/10 text-violet-600 border-violet-500/20 ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
+              {post.generatedBy}
+            </Badge>
+          )}
           {runLabel && (
-            <Badge variant="secondary" className="text-xs ml-auto">
+            <Badge variant="secondary" className={`ml-auto ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
               {runLabel}
             </Badge>
           )}
         </div>
 
         {/* Body */}
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+        <p className={`leading-relaxed whitespace-pre-wrap ${compact ? 'text-xs line-clamp-4' : 'text-sm'}`}>{post.content}</p>
 
         {/* Hashtags */}
         {post.hashtags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
+          <div className="flex flex-wrap gap-1 pt-1">
             {post.hashtags.map((tag) => (
-              <span key={tag} className="inline-flex items-center gap-0.5 text-xs text-primary font-medium bg-primary/5 px-2 py-0.5 rounded-full">
-                <Hash size={10} />
+              <span key={tag} className={`inline-flex items-center gap-0.5 text-primary font-medium bg-primary/5 rounded-full ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs px-2 py-0.5'}`}>
+                <Hash size={compact ? 8 : 10} />
                 {tag}
               </span>
             ))}
@@ -156,13 +239,13 @@ function ContentPostCard({
         )}
 
         {/* Footer */}
-        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-2 border-t">
+        <div className={`flex items-center gap-2 text-muted-foreground border-t ${compact ? 'text-[10px] pt-1.5' : 'text-xs pt-2 gap-3'}`}>
           <span className="flex items-center gap-1">
-            <Clock size={12} />
+            <Clock size={compact ? 10 : 12} />
             {new Date(post.createdAt).toLocaleTimeString()}
           </span>
           <span>{post.characterCount} chars</span>
-          {post.newsSource && (
+          {post.newsSource && !compact && (
             <span className="flex items-center gap-1 truncate ml-auto">
               <LinkSimple size={12} />
               {post.newsSource}
@@ -268,9 +351,9 @@ function CompareView({
       {/* Side-by-side content */}
       <div>
         <h4 className="text-sm font-medium text-muted-foreground mb-3">Generated Posts — Side by Side</h4>
-        <div className="grid gap-6" style={{ gridTemplateColumns: `repeat(${results.length}, 1fr)` }}>
+        <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${results.length}, 1fr)` }}>
           {results.map(({ id, result }) => (
-            <div key={id} className="space-y-4">
+            <div key={id} className="space-y-3">
               <p className="text-xs font-mono text-muted-foreground sticky top-0 bg-background py-1">
                 Run {id.slice(0, 8)}
               </p>
@@ -281,6 +364,7 @@ function CompareView({
                     post={post}
                     imageSet={result!.imageSets.find((is) => is.postId === post.postId)}
                     runLabel={id.slice(0, 8)}
+                    compact
                   />
                 ))}
               </AnimatePresence>
@@ -375,6 +459,9 @@ export function PipelineDashboard() {
   const [compareResults, setCompareResults] = useState<Map<string, PipelineResult>>(new Map())
   const [comparing, setComparing] = useState(false)
 
+  // Partial results from active polling
+  const [activePartial, setActivePartial] = useState<PartialResults | null>(null)
+
   // Run options
   const [selectedPlatform, setSelectedPlatform] = useState<OrchestratorPlatform | 'all'>('all')
   const [selectedTone, setSelectedTone] = useState<OrchestratorTone>('professional')
@@ -408,54 +495,52 @@ export function PipelineDashboard() {
     }
   }, [runs, activeRunId])
 
-  // ─── Poll active run ────────────────────────────────────────────────────
+  // ─── Poll active run (interval-based, survives transient errors) ───────
 
+  const activeStatus = usePolling(
+    () => getPipelineStatus(activeRunId!),
+    3000,
+    !!activeRunId,
+  )
+
+  // React to polled status changes
   useEffect(() => {
-    if (!activeRunId) return
-    let cancelled = false
+    if (!activeStatus || !activeRunId) return
 
-    const poll = async () => {
-      while (!cancelled) {
-        try {
-          const status = await getPipelineStatus(activeRunId)
-
-          // Update the runs list with latest agent statuses
-          if (status.agentStatuses) {
-            setRuns((prev) =>
-              prev.map((r) =>
-                r.id === activeRunId ? { ...r, agentStatuses: status.agentStatuses } : r
-              )
-            )
-          }
-
-          if (status.status !== 'running') {
-            try {
-              const finalId = status.id !== activeRunId ? status.id : activeRunId
-              const result = await getPipelineResult(finalId)
-              if ('pipelineId' in result) {
-                setActiveRunId(null)
-                setPreviewRunId(finalId)
-                setPreviewResult(result)
-                toast.success(
-                  `Pipeline finished: ${result.posts.length} posts generated`,
-                  { description: result.errors.length > 0 ? `${result.errors.length} warnings` : undefined }
-                )
-              }
-            } catch { /* still finalizing */ }
-            await refreshStatus()
-            break
-          }
-        } catch {
-          await refreshStatus()
-          break
-        }
-        await new Promise((r) => setTimeout(r, 3000))
-      }
+    // Sync agent statuses into the runs list
+    if (activeStatus.agentStatuses) {
+      setRuns((prev) =>
+        prev.map((r) =>
+          r.id === activeRunId ? { ...r, agentStatuses: activeStatus.agentStatuses } : r
+        )
+      )
     }
 
-    poll()
-    return () => { cancelled = true }
-  }, [activeRunId, refreshStatus])
+    // Sync partial results for live preview
+    setActivePartial(activeStatus.partialResults ?? null)
+
+    // Handle completion
+    if (activeStatus.status !== 'running') {
+      setActivePartial(null)
+      const finalId = activeStatus.id !== activeRunId ? activeStatus.id : activeRunId
+
+      getPipelineResult(finalId)
+        .then((result) => {
+          if ('pipelineId' in result) {
+            setPreviewRunId(finalId)
+            setPreviewResult(result)
+            toast.success(
+              `Pipeline finished: ${result.posts.length} posts generated`,
+              { description: result.errors.length > 0 ? `${result.errors.length} warnings` : undefined }
+            )
+          }
+        })
+        .catch(() => { /* result will appear in the runs list */ })
+
+      setActiveRunId(null)
+      refreshStatus()
+    }
+  }, [activeStatus, activeRunId, refreshStatus])
 
   // ─── Actions ─────────────────────────────────────────────────────────────
 
@@ -474,6 +559,7 @@ export function PipelineDashboard() {
       setActiveRunId(runId)
       setPreviewRunId(null)
       setPreviewResult(null)
+      setActivePartial(null)
       setComparing(false)
       toast.info('Pipeline started!', { description: dryRun ? 'Dry-run mode' : 'Posts will be published' })
       await refreshStatus()
@@ -660,20 +746,131 @@ export function PipelineDashboard() {
           if (s === 'failed') return 'failed'
           return 'pending'
         }
+
+        // Calculate progress percentage
+        const statuses = ['news_agent', 'content_agent', 'image_agent', 'publish_agent']
+        const completedCount = statuses.filter((a) => {
+          const s = agentStatus(a)
+          return s === 'success' || s === 'failed'
+        }).length
+        const runningCount = statuses.filter((a) => agentStatus(a) === 'running').length
+        const progressPct = Math.round(((completedCount + runningCount * 0.5) / statuses.length) * 100)
+
+        // Build detail strings from partial results
+        const partial = activePartial
+        const newsDetail = partial && partial.newsCount > 0
+          ? `Found ${partial.newsCount} article${partial.newsCount !== 1 ? 's' : ''}`
+          : agentStatus('news_agent') === 'running' ? 'Scanning sources…' : undefined
+        const contentDetail = partial && partial.postCount > 0
+          ? `${partial.postCount} post${partial.postCount !== 1 ? 's' : ''} generated`
+          : agentStatus('content_agent') === 'running' ? 'Writing posts…' : undefined
+        const imageDetail = partial && partial.imageCount > 0
+          ? `${partial.imageCount} image${partial.imageCount !== 1 ? 's' : ''} created`
+          : agentStatus('image_agent') === 'running' ? 'Generating visuals…' : undefined
+        const publishDetail = partial && partial.publishCount > 0
+          ? `${partial.publishCount} published`
+          : agentStatus('publish_agent') === 'running' ? 'Distributing…' : undefined
+
         return (
-          <Card className="border-blue-500/30">
-            <CardHeader>
+          <Card className="border-blue-500/30 overflow-hidden">
+            {/* Progress bar along the top */}
+            <div className="h-1 bg-muted">
+              <motion.div
+                className="h-full bg-gradient-to-r from-blue-500 to-primary"
+                initial={{ width: 0 }}
+                animate={{ width: `${progressPct}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            </div>
+
+            <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <CircleNotch size={20} className="animate-spin text-blue-500" />
                 Pipeline Running
+                <span className="ml-auto text-xs font-normal text-muted-foreground">{progressPct}%</span>
               </CardTitle>
             </CardHeader>
+
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <AgentStep label="Fetching News" icon={Newspaper} status={agentStatus('news_agent')} />
-                <AgentStep label="Generating Content" icon={Lightning} status={agentStatus('content_agent')} />
-                <AgentStep label="Creating Images" icon={ImageSquare} status={agentStatus('image_agent')} />
-                <AgentStep label="Publishing" icon={PaperPlaneTilt} status={agentStatus('publish_agent')} />
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1.5fr] gap-6">
+                {/* Left: vertical stepper */}
+                <div className="space-y-0">
+                  <AgentStep label="Fetching News" icon={Newspaper} status={agentStatus('news_agent')} detail={newsDetail} />
+                  <AgentStep label="Generating Content" icon={Lightning} status={agentStatus('content_agent')} detail={contentDetail} />
+                  <AgentStep label="Creating Images" icon={ImageSquare} status={agentStatus('image_agent')} detail={imageDetail} />
+                  <AgentStep label="Publishing" icon={PaperPlaneTilt} status={agentStatus('publish_agent')} detail={publishDetail} isLast />
+                </div>
+
+                {/* Right: live preview panel */}
+                <div className="space-y-3 border-l pl-5 min-h-[120px]">
+                  {/* News topics discovered */}
+                  {partial && partial.newsTopics.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-1.5"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <Newspaper size={12} weight="duotone" />
+                        News Found
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {partial.newsTopics.map((topic, i) => (
+                          <Badge key={i} variant="outline" className="text-[11px] py-0.5 max-w-[220px] truncate">
+                            {topic}
+                          </Badge>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {/* Post previews */}
+                  {partial && partial.postPreviews.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="space-y-2"
+                    >
+                      <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                        <Lightning size={12} weight="duotone" />
+                        Generated Posts
+                      </p>
+                      {partial.postPreviews.map((preview, i) => (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, x: 12 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.1 }}
+                          className="rounded-lg border bg-card/50 p-2.5 space-y-1"
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <Badge className={`text-[10px] px-1.5 py-0 ${PLATFORM_COLORS[preview.platform] || ''}`}>
+                              {preview.platform}
+                            </Badge>
+                            {preview.generatedBy && (
+                              <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-violet-500/10 text-violet-600 border-violet-500/20">
+                                {preview.generatedBy}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                            {preview.content}{preview.content.length >= 120 ? '…' : ''}
+                          </p>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  )}
+
+                  {/* Empty state while waiting */}
+                  {(!partial || (partial.newsTopics.length === 0 && partial.postPreviews.length === 0)) && (
+                    <div className="flex items-center justify-center h-full text-muted-foreground">
+                      <div className="text-center space-y-1">
+                        <CircleNotch size={24} className="animate-spin mx-auto text-muted-foreground/50" />
+                        <p className="text-xs">Waiting for results…</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>

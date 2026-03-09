@@ -197,12 +197,14 @@ app.post('/api/pipeline/run', (req, res) => {
       record.result = result;
       record.errors = result.errors;
 
-      // Re-key with the real pipeline ID
-      activeRuns.delete(tempId);
+      // Also key by the real pipeline ID (keep tempId as alias for in-flight frontend polls)
       activeRuns.set(result.pipelineId, record);
 
-      // Remove from in-memory after a short delay (Supabase has it now)
-      setTimeout(() => activeRuns.delete(result.pipelineId), 60_000);
+      // Remove both keys after a short delay (Supabase has it now)
+      setTimeout(() => {
+        activeRuns.delete(tempId);
+        activeRuns.delete(result.pipelineId);
+      }, 60_000);
 
       logger.info(`Pipeline ${result.pipelineId} finished: ${record.status}`);
     })
@@ -225,17 +227,19 @@ app.get('/api/pipeline/status/:id', async (req, res) => {
   const record = activeRuns.get(req.params.id);
   if (record) {
     // For running pipelines, pull live agent statuses from the orchestrator
+    let partialResults = undefined;
     if (record.status === 'running') {
       const live = orchestrator.getCurrentPipelineStatus();
       if (live) {
         record.agentStatuses = live.agentStatuses;
+        partialResults = live.partialResults;
         // Also update the record's real pipeline ID once available
         if (live.id !== record.id && !activeRuns.has(live.id)) {
           record.id = live.id;
         }
       }
     }
-    res.json(record);
+    res.json({ ...record, partialResults });
     return;
   }
 
