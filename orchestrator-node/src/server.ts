@@ -6,6 +6,7 @@
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import * as dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Orchestrator, RunOptions, PipelineResult } from './orchestrator';
@@ -364,11 +365,43 @@ app.get('/api/pipeline/history', async (_req, res) => {
   res.json(history);
 });
 
+// ─── Production: serve frontend static files ────────────────────────────────
+
+if (process.env.NODE_ENV === 'production') {
+  const frontendPath = path.resolve(
+    process.env.FRONTEND_DIST_PATH || path.join(__dirname, '..', 'frontend-dist')
+  );
+  app.use(express.static(frontendPath));
+  // SPA fallback: serve index.html for any non-API route (skip /api paths)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  });
+}
+
+// ─── Clean up stale runs on startup ──────────────────────────────────────────
+
+async function cleanupStaleRuns() {
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase
+      .from('pipeline_runs')
+      .update({ status: 'failed', error_log: ['Server restarted while pipeline was running'] })
+      .eq('status', 'running');
+    if (!error && data) {
+      logger.info(`Cleaned up stale running pipelines on startup`);
+    }
+  } catch (err) {
+    logger.warn(`Failed to clean up stale runs: ${err}`);
+  }
+}
+
 // ─── Start server ────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.API_PORT || '3001', 10);
 
-app.listen(PORT, () => {
+app.listen(PORT, async () => {
+  await cleanupStaleRuns();
   logger.info(`API server running on http://localhost:${PORT}`);
   console.log(`\n🚀 Orchestrator API server running on http://localhost:${PORT}\n`);
 });
