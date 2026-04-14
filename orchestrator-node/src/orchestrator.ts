@@ -5,7 +5,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
-import { NewsAgent, ContentAgent, ImageAgent, PublishAgent } from './agents';
+import { NewsAgent, ContentAgent, ImageAgent, PublishAgent, RankingAgent } from './agents';
 import { Config, loadConfig, validateConfig } from './config';
 import {
   NewsItem,
@@ -18,6 +18,7 @@ import {
   Tone,
   ContentApproval,
   PublishStatus,
+  PersonaProfile,
 } from './models';
 import { getLogger, setupLogging, RateLimiter, closeAllLoggers } from './utils';
 
@@ -49,6 +50,44 @@ interface ApprovalQueueRow {
   reviewed_at: string | null;
 }
 
+/** Hardcoded Allen Sharpe persona — single source of truth. */
+const ALLEN_SHARPE: PersonaProfile = {
+  id: 'allen-sharpe',
+  name: 'Allen Sharpe',
+  isActive: true,
+  voice: {
+    tone: 'Fiery, provocative, unapologetically confrontational — like a political podcast host who just saw the headlines and can\'t believe everyone else is silent',
+    vocabulary_level: 'street-smart meets sharp — plain words that hit like a truck, never academic, never corporate',
+    sentence_style: 'punchy declarations, rapid-fire rhetorical questions, dramatic pauses, building intensity — short sentences that land like body shots followed by longer rants that build momentum',
+    rhetorical_devices: ['aggressive rhetorical questions', 'sarcastic incredulity', 'calling out hypocrisy', 'dramatic reframing', 'appeal to common sense', 'mocking repetition', 'provocative hypotheticals'],
+    humor_style: 'biting mockery of the powerful, absurdist sarcasm about institutional failures, deadpan delivery of uncomfortable truths',
+  },
+  beliefs: {
+    core_values: ['individual liberty', 'free markets', 'limited government', 'personal responsibility', 'free speech absolutism'],
+    worldview: 'The establishment lies to you daily and counts on you not paying attention. Personal freedom is non-negotiable. The people in charge aren\'t incompetent — they know exactly what they\'re doing.',
+    policy_leanings: 'aggressively anti-establishment, fiscally conservative, culturally traditional, deeply skeptical of government overreach and corporate media narratives',
+    red_lines: ['government overreach', 'censorship in any form', 'corporate media propaganda', 'woke ideology', 'nanny state policies', 'elitist condescension'],
+  },
+  styleRules: {
+    emoji_usage: 'minimal — max 1 per post, only for emphasis or sarcastic punctuation',
+    hashtag_style: '1-3 per post, provocative or issue-based, never generic trending garbage',
+    cta_patterns: ['Wake up.', 'Tell me I\'m wrong — I dare you.', 'But you\'re not ready for that conversation.', 'Share this before they take it down.', 'Say it with me.', 'Fight me in the comments.', 'Am I the only one seeing this?'],
+    signature_phrases: ['Let that sink in.', 'But sure, keep voting for these people.', 'This is what they don\'t want you talking about.', 'And nobody\'s saying a word.', 'Facts don\'t care about their agenda.', 'They think you\'re stupid. Prove them wrong.'],
+    opening_patterns: ['NEVER reuse an opening across posts — every post must hit different and hit HARD'],
+  },
+  taboos: ['slurs', 'incitement to violence', 'harassment', 'doxxing'],
+  examplePosts: [
+    'They just passed a bill that NOBODY read. Not one page. And they\'re celebrating like they saved the country. You know who they saved? Their donors. Their lobbyists. Their re-election campaigns. You? You\'re footing the bill. Again. Let that sink in.',
+    'So let me get this straight — the government can track every dollar you spend, read every text you send, and flag you for a social media post — but somehow they "can\'t figure out" where billions in taxpayer money went? Please. They know exactly where it went. They just don\'t think you deserve answers.',
+    'The media told you the economy is "booming." Really? Go fill your gas tank. Go buy groceries. Go try to rent an apartment on a normal salary. That\'s the real economy. Not their cherry-picked numbers. Not their curated graphs. YOUR reality. And nobody in Washington wants to talk about it.',
+    'Here\'s what drives me insane — they\'ll lecture you about "misinformation" while running the biggest misinformation campaign in history. Every. Single. Day. The people who lied about everything for years are now the arbiters of truth? Wake up. This isn\'t about protecting you. It\'s about controlling you.',
+    'They want you distracted. They want you arguing about nonsense while they quietly strip away every freedom you thought was guaranteed. And the wildest part? Half the country is cheering them on. You\'re not crazy for questioning it. You\'re crazy if you don\'t. Fight me in the comments.',
+  ],
+  metadata: {},
+  createdAt: new Date('2025-01-01'),
+  updatedAt: new Date('2025-01-01'),
+};
+
 export interface PipelineResult {
   pipelineId: string;
   newsItems: NewsItem[];
@@ -72,6 +111,7 @@ export class Orchestrator {
   private config: Config;
   private supabase: SupabaseClient | null = null;
   private newsAgent: NewsAgent;
+  private rankingAgent: RankingAgent;
   private contentAgent: ContentAgent;
   private imageAgent: ImageAgent;
   private publishAgent: PublishAgent;
@@ -109,6 +149,7 @@ export class Orchestrator {
 
     // Initialize agents
     this.newsAgent = new NewsAgent(this.config, this.rateLimiter);
+    this.rankingAgent = new RankingAgent(this.config, this.rateLimiter);
     this.contentAgent = new ContentAgent(this.config, this.rateLimiter);
     this.imageAgent = new ImageAgent(this.config, this.rateLimiter);
     this.publishAgent = new PublishAgent(this.config, this.rateLimiter);
@@ -209,21 +250,39 @@ export class Orchestrator {
     logger.info(`Starting pipeline ${this.currentPipeline.pipelineId} (dryRun=${dryRun})`);
 
     try {
-      // Stage 1: News Retrieval
-      await this.runNewsAgent(keywords);
+      // Stage 0: Persona (hardcoded Allen Sharpe)
+      this.currentPipeline.agentStatuses['persona_agent'] = AgentStatus.RUNNING;
+      await this.savePipelineState();
+
+      const persona = ALLEN_SHARPE;
+      this.currentPipeline.persona = persona;
+      this.currentPipeline.recentPosts = [];
+      logger.info(`Pipeline using persona "${persona.name}"`);
+      this.currentPipeline.agentStatuses['persona_agent'] = AgentStatus.SUCCESS;
+      await this.savePipelineState();
+
+      // Stage 1: News Retrieval (persona interests augment keywords)
+      const personaKeywords = this.derivePersonaKeywords(persona);
+      const mergedKeywords = keywords?.length
+        ? [...keywords, ...personaKeywords]
+        : personaKeywords.length > 0 ? personaKeywords : undefined;
+      await this.runNewsAgent(mergedKeywords);
 
       if (this.currentPipeline.newsItems.length === 0) {
         logger.warn('No news items retrieved, pipeline stopping');
         return this.completePipeline('completed_no_content');
       }
 
-      // Stage 2: Content Generation
+      // Stage 2: Ranking (persona-aware article selection)
+      await this.runRankingAgent(persona);
+
+      // Stage 3: Content Generation (persona-driven)
       await this.runContentAgent(platforms, tone, postsPerItem);
 
-      // Stage 3: Image Generation
+      // Stage 4: Image Generation
       await this.runImageAgent(imagesPerPost);
 
-      // Stage 4: Publishing (or approval queue)
+      // Stage 5: Publishing (or approval queue)
       if (requireApproval) {
         await this.queueForApproval();
       } else {
@@ -261,6 +320,34 @@ export class Orchestrator {
     }
   }
 
+  private async runRankingAgent(persona?: PersonaProfile): Promise<void> {
+    this.currentPipeline!.currentAgent = 'ranking_agent';
+    this.currentPipeline!.agentStatuses['ranking_agent'] = AgentStatus.RUNNING;
+    await this.savePipelineState();
+
+    try {
+      const rankedItems = await this.rankingAgent.run<NewsItem[]>(
+        this.currentPipeline!.newsItems,
+        persona
+      );
+      this.currentPipeline!.newsItems = rankedItems;
+      this.currentPipeline!.agentStatuses['ranking_agent'] = AgentStatus.SUCCESS;
+      logger.info(`Ranking agent completed: ${rankedItems.length} top articles selected`);
+    } catch (error) {
+      this.currentPipeline!.agentStatuses['ranking_agent'] = AgentStatus.FAILED;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.currentPipeline!.errorLog.push(`Ranking agent error (using original order): ${errorMessage}`);
+      logger.warn(`Ranking agent failed, using top articles by relevance: ${errorMessage}`);
+
+      // Fallback: just slice to maxPostsPerRun from the existing sorted list
+      const maxPosts = this.config.maxPostsPerRun || 3;
+      this.currentPipeline!.newsItems = this.currentPipeline!.newsItems.slice(0, maxPosts);
+      this.currentPipeline!.agentStatuses['ranking_agent'] = AgentStatus.SUCCESS;
+    }
+
+    await this.savePipelineState();
+  }
+
   private async runContentAgent(
     platforms: Platform[],
     tone: Tone,
@@ -270,12 +357,17 @@ export class Orchestrator {
     this.currentPipeline!.agentStatuses['content_agent'] = AgentStatus.RUNNING;
     await this.savePipelineState();
 
+    const persona = this.currentPipeline!.persona;
+    const recentPosts = this.currentPipeline!.recentPosts ?? [];
+
     try {
       const posts = await this.contentAgent.run<SocialPost[]>(
         this.currentPipeline!.newsItems,
         platforms,
         tone,
-        postsPerItem
+        postsPerItem,
+        persona,
+        recentPosts
       );
       this.currentPipeline!.posts = posts;
       this.currentPipeline!.agentStatuses['content_agent'] = AgentStatus.SUCCESS;
@@ -291,7 +383,7 @@ export class Orchestrator {
       const selectedNews = this.currentPipeline!.newsItems.slice(0, this.config.maxPostsPerRun || 3);
       for (let i = 0; i < selectedNews.length; i++) {
         const platform = platforms[i % platforms.length];
-        posts.push(this.generateTemplatePost(selectedNews[i], platform, tone));
+        posts.push(this.generateTemplatePost(selectedNews[i], platform, tone, persona));
       }
       this.currentPipeline!.posts = posts;
       this.currentPipeline!.agentStatuses['content_agent'] = AgentStatus.SUCCESS;
@@ -469,7 +561,36 @@ export class Orchestrator {
     }
   }
 
-  private generateTemplatePost(newsItem: NewsItem, platform: Platform, tone: Tone): SocialPost {
+  private generateTemplatePost(newsItem: NewsItem, platform: Platform, tone: Tone, persona?: PersonaProfile): SocialPost {
+    // Persona-aware templates
+    if (persona) {
+      const openingPatterns = persona.styleRules.opening_patterns;
+      const signaturePhrases = persona.styleRules.signature_phrases;
+      const opening = openingPatterns.length > 0
+        ? openingPatterns[Math.floor(Math.random() * openingPatterns.length)]
+        : 'Here\'s the thing:';
+      const signature = signaturePhrases.length > 0
+        ? signaturePhrases[Math.floor(Math.random() * signaturePhrases.length)]
+        : '';
+      const hashtags = newsItem.keywords.slice(0, 3).map((kw) => `#${kw.replace(/\s+/g, '')}`);
+      const content = `${opening} ${newsItem.topic.slice(0, 100)}. ${signature} ${hashtags.join(' ')}`.trim();
+      const imagePrompt = `Professional illustration representing: ${newsItem.topic.slice(0, 50)}`;
+
+      return {
+        postId: uuidv4(),
+        content,
+        platform,
+        hashtags: hashtags.map((h) => h.replace('#', '')),
+        imagePrompt,
+        personaId: persona.id,
+        characterCount: content.length,
+        newsSource: newsItem.url,
+        generatedBy: 'template-persona',
+        createdAt: new Date(),
+      };
+    }
+
+    // Legacy tone-based templates
     const templates: Record<Tone, string[]> = {
       [Tone.CASUAL]: ['Check this out! {topic} 🔥'],
       [Tone.PROFESSIONAL]: ['Key insight: {topic}. Learn more about how this impacts our industry.'],
@@ -604,6 +725,38 @@ export class Orchestrator {
       errorLog: row.error_log as string[],
       dryRun: row.dry_run,
     }));
+  }
+
+  // ─── Persona management ────────────────────────────────────────────────────
+
+  /** Returns the hardcoded Allen Sharpe persona. */
+  getActivePersona(): PersonaProfile {
+    return ALLEN_SHARPE;
+  }
+
+  /** Derive search keywords from persona beliefs and values for news retrieval. */
+  private derivePersonaKeywords(persona: PersonaProfile): string[] {
+    const keywords: string[] = [];
+
+    // Core values make good search terms (e.g. "individual liberty", "free markets")
+    for (const v of persona.beliefs.core_values.slice(0, 3)) {
+      keywords.push(v);
+    }
+
+    // Policy leanings often reference domains (e.g. "fiscally conservative" → economy topics)
+    if (persona.beliefs.policy_leanings) {
+      const leaningKeywords = persona.beliefs.policy_leanings
+        .split(/[,;]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 2)
+        .slice(0, 2);
+      keywords.push(...leaningKeywords);
+    }
+
+    // Add broad topic words so the news filter casts a wider net
+    keywords.push('politics', 'economy', 'policy', 'government', 'business');
+
+    return keywords;
   }
 
   /**

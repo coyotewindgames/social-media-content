@@ -303,7 +303,12 @@ export class PublishAgent extends BaseAgent {
       };
     }
 
-    // Step 1: Create media container
+    // Carousel publishing: use Graph API CAROUSEL type when post has multiple slides
+    if (post.carouselSlides && post.carouselSlides.length > 1 && images.images.length > 1) {
+      return this.publishInstagramCarousel(post, images);
+    }
+
+    // Standard single-image publish
     const containerUrl = new URL(
       `https://graph.facebook.com/v18.0/${this.config.instagramBusinessId}/media`
     );
@@ -330,7 +335,6 @@ export class PublishAgent extends BaseAgent {
     const containerData = await containerResponse.json() as { id?: string };
     const containerId = containerData.id;
 
-    // Step 2: Publish the container
     const publishUrl = new URL(
       `https://graph.facebook.com/v18.0/${this.config.instagramBusinessId}/media_publish`
     );
@@ -360,6 +364,109 @@ export class PublishAgent extends BaseAgent {
         platform: Platform.INSTAGRAM,
         status: PublishStatus.FAILED,
         errorMessage: `Instagram publish error: ${errorText}`,
+        retryCount: 0,
+      };
+    }
+  }
+
+  /**
+   * Publish an Instagram carousel using the Graph API CAROUSEL media type.
+   */
+  private async publishInstagramCarousel(post: SocialPost, images: ImageSet): Promise<PublishResult> {
+    const businessId = this.config.instagramBusinessId!;
+    const accessToken = this.config.instagramAccessToken!;
+    const childContainerIds: string[] = [];
+
+    // Step 1: Create child image containers (max 10 per carousel)
+    const slideImages = images.images.slice(0, 10);
+    for (const image of slideImages) {
+      const childUrl = new URL(`https://graph.facebook.com/v18.0/${businessId}/media`);
+      childUrl.searchParams.set('image_url', image.url);
+      childUrl.searchParams.set('is_carousel_item', 'true');
+      childUrl.searchParams.set('access_token', accessToken);
+
+      const childResponse = await fetch(childUrl.toString(), {
+        method: 'POST',
+        signal: AbortSignal.timeout(60000),
+      });
+
+      if (!childResponse.ok) {
+        const errorText = await childResponse.text();
+        this.logger.warn(`Carousel child container failed: ${errorText}`);
+        continue;
+      }
+
+      const childData = await childResponse.json() as { id?: string };
+      if (childData.id) {
+        childContainerIds.push(childData.id);
+      }
+    }
+
+    if (childContainerIds.length < 2) {
+      return {
+        postId: post.postId,
+        platform: Platform.INSTAGRAM,
+        status: PublishStatus.FAILED,
+        errorMessage: `Carousel requires at least 2 images, only ${childContainerIds.length} succeeded`,
+        retryCount: 0,
+      };
+    }
+
+    // Step 2: Create carousel container
+    const carouselUrl = new URL(`https://graph.facebook.com/v18.0/${businessId}/media`);
+    carouselUrl.searchParams.set('media_type', 'CAROUSEL');
+    carouselUrl.searchParams.set('children', childContainerIds.join(','));
+    carouselUrl.searchParams.set('caption', post.content);
+    carouselUrl.searchParams.set('access_token', accessToken);
+
+    const carouselResponse = await fetch(carouselUrl.toString(), {
+      method: 'POST',
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (!carouselResponse.ok) {
+      const errorText = await carouselResponse.text();
+      return {
+        postId: post.postId,
+        platform: Platform.INSTAGRAM,
+        status: PublishStatus.FAILED,
+        errorMessage: `Instagram carousel container error: ${errorText}`,
+        retryCount: 0,
+      };
+    }
+
+    const carouselData = await carouselResponse.json() as { id?: string };
+    const carouselContainerId = carouselData.id;
+
+    // Step 3: Publish the carousel
+    const publishUrl = new URL(`https://graph.facebook.com/v18.0/${businessId}/media_publish`);
+    publishUrl.searchParams.set('creation_id', carouselContainerId ?? '');
+    publishUrl.searchParams.set('access_token', accessToken);
+
+    const publishResponse = await fetch(publishUrl.toString(), {
+      method: 'POST',
+      signal: AbortSignal.timeout(60000),
+    });
+
+    if (publishResponse.ok) {
+      const data = await publishResponse.json() as { id?: string };
+      const mediaId = data.id ?? '';
+      this.logger.info(`Instagram carousel published: ${childContainerIds.length} slides`);
+      return {
+        postId: post.postId,
+        platform: Platform.INSTAGRAM,
+        status: PublishStatus.PUBLISHED,
+        postUrl: `https://www.instagram.com/p/${mediaId}`,
+        retryCount: 0,
+        publishedAt: new Date(),
+      };
+    } else {
+      const errorText = await publishResponse.text();
+      return {
+        postId: post.postId,
+        platform: Platform.INSTAGRAM,
+        status: PublishStatus.FAILED,
+        errorMessage: `Instagram carousel publish error: ${errorText}`,
         retryCount: 0,
       };
     }

@@ -77,8 +77,19 @@ export class NewsAgent extends BaseAgent {
     // Apply content filters
     const filteredNews = this.applyFilters(allNews, keywords);
 
-    this.logger.info(`Retrieved ${filteredNews.length} news items`);
-    return filteredNews.slice(0, 3);
+    const candidateCount = this.config.maxCandidateArticles || 20;
+
+    // If keyword filtering removed everything, fall back to unfiltered results
+    // (deduplication + recency still applied)
+    if (filteredNews.length === 0 && allNews.length > 0) {
+      this.logger.warn(`Keyword filter removed all ${allNews.length} articles — falling back to unfiltered results`);
+      const unfilteredNews = this.applyFilters(allNews);
+      this.logger.info(`Retrieved ${unfilteredNews.length} news items (unfiltered), returning top ${candidateCount} candidates`);
+      return unfilteredNews.slice(0, candidateCount);
+    }
+
+    this.logger.info(`Retrieved ${filteredNews.length} news items, returning top ${candidateCount} candidates`);
+    return filteredNews.slice(0, candidateCount);
   }
 
   private async fetchNewsApi(keywords?: string[]): Promise<NewsItem[]> {
@@ -347,10 +358,16 @@ export class NewsAgent extends BaseAgent {
       // Filter by recency (last 24 hours)
       if (item.timestamp < dayAgo) continue;
 
-      // Filter by keywords if provided
+      // Filter by keywords if provided — match on individual words so
+      // multi-word phrases like "free markets" match articles about "markets"
       if (keywords?.length) {
         const itemText = `${item.topic} ${item.summary}`.toLowerCase();
-        if (!keywords.some((kw) => itemText.includes(kw.toLowerCase()))) {
+        const kwWords = new Set(
+          keywords.flatMap((kw) =>
+            kw.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !STOPWORDS.has(w))
+          )
+        );
+        if (![...kwWords].some((w) => itemText.includes(w))) {
           continue;
         }
       }

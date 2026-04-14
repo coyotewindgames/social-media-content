@@ -12,12 +12,64 @@ export enum Platform {
 }
 
 // Content tone options
+/** @deprecated Persona voice replaces Tone. Kept for backward compatibility. */
 export enum Tone {
   CASUAL = 'casual',
   PROFESSIONAL = 'professional',
   PLAYFUL = 'playful',
   INSPIRATIONAL = 'inspirational',
   INFORMATIVE = 'informative',
+}
+
+// ─── Persona Types ───────────────────────────────────────────────────────────
+
+export interface PersonaVoice {
+  tone: string;                     // e.g. "conversational, confident, slightly sardonic"
+  vocabulary_level: string;         // e.g. "accessible everyday language"
+  sentence_style: string;           // e.g. "short punchy sentences, rhetorical questions"
+  rhetorical_devices: string[];     // e.g. ["irony", "understatement", "analogy"]
+  humor_style: string;              // e.g. "dry wit, absurdist comparisons"
+}
+
+export interface PersonaBeliefs {
+  core_values: string[];            // e.g. ["individual liberty", "free markets"]
+  worldview: string;                // 1-2 sentence summary
+  policy_leanings: string;          // e.g. "fiscally conservative, socially moderate"
+  red_lines: string[];              // positions this persona NEVER endorses
+}
+
+export interface PersonaStyleRules {
+  emoji_usage: string;              // e.g. "minimal — max 1 per post"
+  hashtag_style: string;            // e.g. "1-3 per post, original or issue-based"
+  cta_patterns: string[];           // e.g. ["What do you think?", "Agree or disagree?"]
+  signature_phrases: string[];      // recurring catchphrases
+  opening_patterns: string[];       // how posts typically start
+}
+
+export interface PersonaProfile {
+  id: string;                       // UUID from Supabase
+  name: string;                     // Always "Allen Sharpe"
+  isActive: boolean;
+  voice: PersonaVoice;
+  beliefs: PersonaBeliefs;
+  styleRules: PersonaStyleRules;
+  taboos: string[];                 // hard-banned topics/phrases
+  examplePosts: string[];           // 3-5 gold-standard example posts
+  metadata: Record<string, unknown>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface PostHistoryEntry {
+  id: string;
+  personaId: string;
+  platform: string;
+  content: string;
+  topicSummary?: string;
+  hashtags: string[];
+  newsSourceUrl?: string;
+  contentHash: string;
+  createdAt: Date;
 }
 
 // Agent execution status
@@ -47,6 +99,15 @@ export interface NewsItem {
   keywords: string[];
   timestamp: Date;
   relevanceScore: number;
+  postworthinessScore?: number;
+  rankingReason?: string;
+}
+
+// Instagram carousel slide
+export interface CarouselSlide {
+  slideNumber: number;
+  text: string;
+  imagePrompt: string;
 }
 
 // Generated social media post content
@@ -56,11 +117,15 @@ export interface SocialPost {
   platform: Platform;
   hashtags: string[];
   imagePrompt?: string;
-  tone: Tone;
+  /** @deprecated Use persona voice instead. Kept for backward compat. */
+  tone?: Tone;
   callToAction?: string;
   characterCount: number;
   newsSource?: string;
   generatedBy?: string;
+  personaId?: string;
+  /** Instagram carousel slides. When present, each slide gets its own image. */
+  carouselSlides?: CarouselSlide[];
   createdAt: Date;
 }
 
@@ -101,6 +166,8 @@ export interface PipelineState {
   pipelineId: string;
   startedAt: Date;
   completedAt?: Date;
+  persona?: PersonaProfile;
+  recentPosts?: PostHistoryEntry[];
   newsItems: NewsItem[];
   posts: SocialPost[];
   imageSets: ImageSet[];

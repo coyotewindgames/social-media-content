@@ -32,7 +32,7 @@ program
   )
   .option(
     '-t, --tone <tone>',
-    'Content tone (casual, professional, playful, inspirational, informative)',
+    '(DEPRECATED: persona voice replaces tone) Content tone',
     'professional'
   )
   .option('-s, --schedule', 'Run with scheduler at optimal posting times')
@@ -42,6 +42,21 @@ program
   .option('--approve-post <postId>', 'Approve a post by ID')
   .option('--reject-post <postId>', 'Reject a post by ID')
   .option('--history', 'Show pipeline run history');
+
+// ─── Persona subcommand ──────────────────────────────────────────────────────
+
+program
+  .command('show-persona')
+  .description('Display the hardcoded Allen Sharpe persona')
+  .action(() => {
+    const config = loadConfig();
+    setupLogging({ logDir: config.logDir, logLevel: config.logLevel as 'debug' | 'info' | 'warn' | 'error' });
+    const orchestrator = new Orchestrator(config);
+    const persona = orchestrator.getActivePersona();
+    console.log(`\nActive Persona: ${persona.name} (id: ${persona.id})\n`);
+    console.log(JSON.stringify(persona, null, 2));
+    orchestrator.close();
+  });
 
 program.parse();
 
@@ -309,7 +324,13 @@ program.addHelpText(
   'after',
   `
 Examples:
-  # Run once in dry-run mode
+  # Generate a persona (one-time setup)
+  npx ts-node src/main.ts generate-persona --seed "slightly right-leaning political influencer" --save
+  
+  # Show the active persona
+  npx ts-node src/main.ts show-persona
+  
+  # Run once in dry-run mode (uses active persona)
   npx ts-node src/main.ts --dry-run
   
   # Run with specific keywords

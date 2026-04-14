@@ -103,6 +103,57 @@ CREATE TRIGGER update_approval_queue_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
+-- Personas Table
+-- Stores structured persona profiles used for content generation
+CREATE TABLE IF NOT EXISTS personas (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT TRUE,
+  voice JSONB NOT NULL,          -- { tone, vocabulary_level, sentence_style, rhetorical_devices, humor_style }
+  beliefs JSONB NOT NULL,        -- { core_values[], worldview, policy_leanings, red_lines[] }
+  style_rules JSONB NOT NULL,    -- { emoji_usage, hashtag_style, cta_patterns[], signature_phrases[], opening_patterns[] }
+  taboos TEXT[] NOT NULL DEFAULT '{}',
+  example_posts TEXT[] DEFAULT '{}',
+  metadata JSONB DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE personas ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations for authenticated users" ON personas
+  FOR ALL USING (true);
+
+CREATE INDEX idx_personas_is_active ON personas(is_active) WHERE is_active = TRUE;
+
+-- Post History Table
+-- Lightweight dedup store for past posts, separate from heavy pipeline_runs JSONB
+CREATE TABLE IF NOT EXISTS post_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  persona_id UUID REFERENCES personas(id) ON DELETE SET NULL,
+  platform TEXT NOT NULL,
+  content TEXT NOT NULL,
+  topic_summary TEXT,
+  hashtags TEXT[] DEFAULT '{}',
+  news_source_url TEXT,
+  content_hash TEXT NOT NULL,     -- SHA-256 of normalized content for exact-dupe check
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE post_history ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all operations for authenticated users" ON post_history
+  FOR ALL USING (true);
+
+CREATE INDEX idx_post_history_persona_created ON post_history(persona_id, created_at DESC);
+CREATE INDEX idx_post_history_content_hash ON post_history(content_hash);
+
+-- Trigger for personas updated_at
+CREATE TRIGGER update_personas_updated_at
+  BEFORE UPDATE ON personas
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
 -- Optional: Create a view for recent pipeline summaries
 CREATE OR REPLACE VIEW pipeline_summaries AS
 SELECT 

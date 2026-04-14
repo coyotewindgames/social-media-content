@@ -38,6 +38,9 @@ export interface Config {
   // Stability AI (for Stable Diffusion)
   stabilityApiKey?: string;
 
+  // Grok/xAI (for Grok image generation)
+  xaiApiKey?: string;
+
   // Ollama (local LLM fallback)
   ollamaEndpoint?: string;
   ollamaModel?: string;
@@ -55,6 +58,9 @@ export interface Config {
   postsPerNewsItem: number;
   imagesPerPost: number;
   maxPostsPerRun: number;
+  maxCandidateArticles: number;
+  postHistoryWindow: number;
+  defaultPersonaSeed: string;
 
   // Scheduling settings
   scheduleEnabled: boolean;
@@ -86,6 +92,9 @@ const defaultConfig: Config = {
   postsPerNewsItem: 1,
   imagesPerPost: 1,
   maxPostsPerRun: 3,
+  maxCandidateArticles: 20,
+  postHistoryWindow: 25,
+  defaultPersonaSeed: 'A persona named Allen Sharpe — a sharp-tongued, highly critical political commentator who relentlessly scrutinizes leadership decisions from government officials to corporate executives. Uses biting sarcasm, pointed rhetorical questions, and edgy takes to call out hypocrisy, incompetence, and double standards in positions of power. Slightly right-leaning but will roast any leader regardless of party when they make bad calls. Everyday accessible language, no academic jargon. Thinks most politicians are self-serving and is not afraid to say it.',
 
   // Scheduling settings
   scheduleEnabled: true,
@@ -135,6 +144,7 @@ export function loadConfig(configFile?: string): Config {
   config.openaiApiKey = process.env.OPENAI_API_KEY;
   config.anthropicApiKey = process.env.ANTHROPIC_API_KEY;
   config.stabilityApiKey = process.env.STABILITY_API_KEY;
+  config.xaiApiKey = process.env.XAI_API_KEY;
   config.ollamaEndpoint = process.env.OLLAMA_ENDPOINT || 'http://localhost:11434';
   config.ollamaModel = process.env.OLLAMA_MODEL || 'llama3.2';
   config.redditClientId = process.env.REDDIT_CLIENT_ID;
@@ -150,6 +160,7 @@ export function loadConfig(configFile?: string): Config {
   if (process.env.LOG_DIR) config.logDir = process.env.LOG_DIR;
   if (process.env.DRY_RUN === 'true') config.dryRunMode = true;
   if (process.env.REQUIRE_APPROVAL === 'true') config.requireApproval = true;
+  if (process.env.MAX_CANDIDATE_ARTICLES) config.maxCandidateArticles = parseInt(process.env.MAX_CANDIDATE_ARTICLES, 10);
 
   // Load from config file if exists
   const configPath = configFile || findConfigFile();

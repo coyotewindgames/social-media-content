@@ -1,5 +1,5 @@
 /**
- * Image Generation Agent - Creates images using AI image generation APIs.
+ * Image Generation Agent - Creates images using Grok (xAI) with Unsplash fallback.
  */
 
 import { BaseAgent } from './baseAgent';
@@ -7,8 +7,8 @@ import { Config } from '../config';
 import { SocialPost, ImageSet, GeneratedImage, ImageDimensions, PLATFORM_DIMENSIONS } from '../models';
 import { RateLimiter, retryWithBackoff } from '../utils';
 
-// Stock image URLs for fallback
-const STOCK_IMAGE_FALLBACKS = [
+// Unsplash fallback images by category
+const UNSPLASH_FALLBACKS = [
   'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=1200', // News
   'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200', // Social
   'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1200', // Business
@@ -18,12 +18,14 @@ const STOCK_IMAGE_FALLBACKS = [
 
 export class ImageAgent extends BaseAgent {
   private config: Config;
+  private useGrok: boolean;
   private useDalle: boolean;
   private useStability: boolean;
 
   constructor(config: Config, rateLimiter?: RateLimiter) {
     super('image_agent', rateLimiter);
     this.config = config;
+    this.useGrok = !!config.xaiApiKey;
     this.useDalle = !!config.openaiApiKey;
     this.useStability = !!config.stabilityApiKey;
   }
@@ -31,7 +33,8 @@ export class ImageAgent extends BaseAgent {
   async execute(posts: SocialPost[], imagesPerPost = 1): Promise<ImageSet[]> {
     imagesPerPost = Math.min(Math.max(imagesPerPost, 1), 3);
 
-    this.logger.info(`Generating images for ${posts.length} posts`);
+    const provider = this.useGrok ? 'Grok' : this.useDalle ? 'DALL-E' : this.useStability ? 'Stability' : 'Unsplash fallback';
+    this.logger.info(`Generating images for ${posts.length} posts using ${provider}`);
 
     const imageSets: ImageSet[] = [];
     const batchSize = 5;
@@ -51,7 +54,7 @@ export class ImageAgent extends BaseAgent {
           imageSets.push(result.value);
         } else {
           this.logger.error(`Image generation failed for ${post.postId}: ${result.reason}`);
-          imageSets.push(this.getFallbackImages(post));
+          imageSets.push(this.getUnsplashFallback(post));
         }
       }
     }
@@ -63,28 +66,50 @@ export class ImageAgent extends BaseAgent {
   private async generateImagesForPost(post: SocialPost, count: number): Promise<ImageSet> {
     if (!post.imagePrompt) {
       this.logger.debug(`No image prompt for post ${post.postId}`);
-      return this.getFallbackImages(post);
+      return this.getUnsplashFallback(post);
     }
 
     const dimensions = PLATFORM_DIMENSIONS[post.platform] ?? [{ width: 1024, height: 1024 }];
     const images: GeneratedImage[] = [];
 
+    // For carousel posts, generate one image per slide using each slide's prompt
+    if (post.carouselSlides && post.carouselSlides.length > 0) {
+      const carouselDim = dimensions.find((d) => d.width === 1080 && d.height === 1350) ?? dimensions[0];
+      this.logger.info(`Generating ${post.carouselSlides.length} carousel slide images for ${post.postId}`);
+
+      for (const slide of post.carouselSlides) {
+        try {
+          const image = await this.generateSingleImage(slide.imagePrompt, carouselDim);
+          images.push({ ...image, altText: `Slide ${slide.slideNumber}: ${slide.text.slice(0, 80)}` });
+        } catch (e) {
+          this.logger.warn(`Carousel slide ${slide.slideNumber} image failed, using fallback: ${e}`);
+          images.push(this.getUnsplashImage(carouselDim, slide.slideNumber));
+        }
+      }
+
+      return { postId: post.postId, images, createdAt: new Date() };
+    }
+
+    // Standard single-image flow
     for (let i = 0; i < count; i++) {
       const dim = dimensions[i % dimensions.length];
 
       try {
-        if (this.useDalle) {
+        if (this.useGrok) {
+          const image = await this.generateWithGrok(post.imagePrompt, dim);
+          images.push(image);
+        } else if (this.useDalle) {
           const image = await this.generateWithDalle(post.imagePrompt, dim);
           images.push(image);
         } else if (this.useStability) {
           const image = await this.generateWithStability(post.imagePrompt, dim);
           images.push(image);
         } else {
-          images.push(this.getStockImage(dim, i));
+          images.push(this.getUnsplashImage(dim, i));
         }
       } catch (e) {
-        this.logger.error(`Failed to generate image ${i + 1}: ${e}`);
-        images.push(this.getStockImage(dim, i));
+        this.logger.warn(`AI image generation failed, falling back to Unsplash: ${e}`);
+        images.push(this.getUnsplashImage(dim, i));
       }
     }
 
@@ -95,12 +120,74 @@ export class ImageAgent extends BaseAgent {
     };
   }
 
+  /**
+   * Generate a single image using the best available provider.
+   */
+  private async generateSingleImage(prompt: string, dim: ImageDimensions): Promise<GeneratedImage> {
+    if (this.useGrok) {
+      return this.generateWithGrok(prompt, dim);
+    } else if (this.useDalle) {
+      return this.generateWithDalle(prompt, dim);
+    } else if (this.useStability) {
+      return this.generateWithStability(prompt, dim);
+    }
+    throw new Error('No image provider configured');
+  }
+
+  private async generateWithGrok(prompt: string, dimensions: ImageDimensions): Promise<GeneratedImage> {
+    if (!(await this.rateLimiter.acquire('xai_grok'))) {
+      throw new Error('Grok rate limited');
+    }
+
+    return retryWithBackoff(
+      async () => {
+        const response = await fetch('https://api.x.ai/v1/images/generations', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.config.xaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: this.enhancePrompt(prompt),
+            model: 'grok-imagine-image',
+            n: 1,
+            response_format: 'url',
+          }),
+          signal: AbortSignal.timeout(120000),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Grok API error: ${response.status} - ${errorText}`);
+        }
+
+        const data = await response.json() as {
+          data?: Array<{ url?: string; b64_json?: string }>;
+        };
+
+        const imageData = data.data?.[0];
+        const imageUrl = imageData?.url ?? '';
+
+        if (!imageUrl) {
+          throw new Error('No image URL returned from Grok API');
+        }
+
+        return {
+          url: imageUrl,
+          format: 'png' as const,
+          dimensions,
+          altText: prompt.slice(0, 200),
+        };
+      },
+      { maxRetries: 2, baseDelayMs: 5000 }
+    );
+  }
+
   private async generateWithDalle(prompt: string, dimensions: ImageDimensions): Promise<GeneratedImage> {
     if (!(await this.rateLimiter.acquire('openai_dalle'))) {
       throw new Error('DALL-E rate limited');
     }
 
-    // DALL-E 3 supports specific sizes
     const aspectRatio = dimensions.width / dimensions.height;
     let size: string;
     if (aspectRatio > 1.5) {
@@ -144,7 +231,7 @@ export class ImageAgent extends BaseAgent {
 
         return {
           url: imageUrl,
-          format: 'png',
+          format: 'png' as const,
           dimensions: { width, height },
           altText: prompt.slice(0, 200),
         };
@@ -193,7 +280,7 @@ export class ImageAgent extends BaseAgent {
 
         return {
           url: `data:image/png;base64,${base64Data}`,
-          format: 'png',
+          format: 'png' as const,
           dimensions,
           altText: prompt.slice(0, 200),
         };
@@ -212,11 +299,9 @@ export class ImageAgent extends BaseAgent {
     return `${prompt}, ${enhancements.join(', ')}`;
   }
 
-  private getStockImage(dimensions: ImageDimensions, index = 0): GeneratedImage {
-    const stockUrl = STOCK_IMAGE_FALLBACKS[index % STOCK_IMAGE_FALLBACKS.length];
+  private getUnsplashImage(dimensions: ImageDimensions, index = 0): GeneratedImage {
+    const stockUrl = UNSPLASH_FALLBACKS[index % UNSPLASH_FALLBACKS.length];
 
-    // Add dimension parameters for Unsplash URLs
-    // Using URL parsing to validate the domain for security
     let finalUrl = stockUrl;
     try {
       const parsed = new URL(stockUrl);
@@ -231,16 +316,16 @@ export class ImageAgent extends BaseAgent {
       url: finalUrl,
       format: 'jpeg',
       dimensions,
-      altText: 'Stock image',
+      altText: 'Unsplash stock image',
     };
   }
 
-  private getFallbackImages(post: SocialPost): ImageSet {
+  private getUnsplashFallback(post: SocialPost): ImageSet {
     const dimensions = PLATFORM_DIMENSIONS[post.platform]?.[0] ?? { width: 1024, height: 1024 };
 
     return {
       postId: post.postId,
-      images: [this.getStockImage(dimensions)],
+      images: [this.getUnsplashImage(dimensions)],
       createdAt: new Date(),
     };
   }
