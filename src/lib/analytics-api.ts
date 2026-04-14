@@ -7,10 +7,11 @@ import {
   HistoricalMetric,
   GrowthMetrics,
 } from './types'
+import { llmPrompt, callLLM } from './llm'
 
 export class AnalyticsAPI {
   static async fetchAccountAnalytics(account: SocialAccount): Promise<AccountAnalytics> {
-    const prompt = window.spark.llmPrompt`Generate realistic analytics data for a ${account.platform} account named @${account.username}. Return valid JSON with these exact fields:
+    const prompt = llmPrompt`Generate realistic analytics data for a ${account.platform} account named @${account.username}. Return valid JSON with these exact fields:
 {
   "accountId": "${account.id}",
   "platform": "${account.platform}",
@@ -45,7 +46,7 @@ export class AnalyticsAPI {
 }
 Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
   }
 
@@ -57,7 +58,7 @@ Return ONLY valid JSON.`
     publishedAt: string,
     caption: string
   ): Promise<PostMetrics> {
-    const prompt = window.spark.llmPrompt`Generate realistic post analytics for a ${account.platform} post. Return valid JSON with these exact fields:
+    const prompt = llmPrompt`Generate realistic post analytics for a ${account.platform} post. Return valid JSON with these exact fields:
 {
   "postId": "${postId}",
   "contentId": "${contentId}",
@@ -75,7 +76,7 @@ Return ONLY valid JSON.`
 }
 Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
   }
 
@@ -83,7 +84,7 @@ Return ONLY valid JSON.`
     account: SocialAccount,
     days: number = 30
   ): Promise<HistoricalMetric[]> {
-    const prompt = window.spark.llmPrompt`Generate ${days} days of historical analytics data for a ${account.platform} account. Create a realistic growth trend showing gradual increases. Return valid JSON object with a single property "data" containing an array of ${days} objects, each with:
+    const prompt = llmPrompt`Generate ${days} days of historical analytics data for a ${account.platform} account. Create a realistic growth trend showing gradual increases. Return valid JSON object with a single property "data" containing an array of ${days} objects, each with:
 {
   "data": [
     {
@@ -103,7 +104,7 @@ Return ONLY valid JSON.`
 }
 Make the data show realistic growth patterns. Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     const parsed = JSON.parse(response)
     return parsed.data || []
   }

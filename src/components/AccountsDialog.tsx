@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import { SocialAccount, Platform } from '@/lib/types'
 import { SocialMediaAPI } from '@/lib/social-api'
 import {
@@ -46,7 +46,7 @@ const statusIcons = {
 }
 
 export function AccountsDialog({ open, onClose }: AccountsDialogProps) {
-  const [accounts, setAccounts] = useKV<SocialAccount[]>('social-accounts', [])
+  const [accounts, setAccounts] = useLocalStorage<SocialAccount[]>('social-accounts', [])
   const [connecting, setConnecting] = useState<Platform | null>(null)
 
   const handleConnectAccount = async (platform: Platform) => {

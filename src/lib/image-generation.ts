@@ -5,6 +5,8 @@ export interface ImageGenerationResult {
   prompt?: string
 }
 
+import { llmPrompt, callLLM } from './llm'
+
 export async function generateImageFromContent(
   title: string,
   description: string,
@@ -58,7 +60,7 @@ async function createImagePrompt(
   description: string,
   platform: string
 ): Promise<string> {
-  const promptRequest = window.spark.llmPrompt`You are an expert at creating prompts for AI image generation (Stable Diffusion). 
+  const promptRequest = llmPrompt`You are an expert at creating prompts for AI image generation (Stable Diffusion). 
 
 Create a detailed, vivid image generation prompt based on this social media content:
 
@@ -77,7 +79,7 @@ Requirements:
 
 Return ONLY the prompt text, nothing else.`
 
-  const prompt = await window.spark.llm(promptRequest, 'gpt-4o-mini')
+  const prompt = await callLLM(promptRequest, 'gpt-4o-mini')
   return prompt.trim()
 }
 

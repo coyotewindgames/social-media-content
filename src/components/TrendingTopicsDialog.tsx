@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Platform, CaptionTone, ContentIdea } from '@/lib/types'
+import { llmPrompt, callLLM } from '@/lib/llm'
 import {
   Dialog,
   DialogContent,
@@ -56,7 +57,7 @@ export function TrendingTopicsDialog({
 
     try {
       const timeFrameText = timeFrame === 'today' ? 'today' : 'this week'
-      const prompt = window.spark.llmPrompt`You are a social media trends analyst. Identify 8 trending topics for ${timeFrameText} that would be perfect for social media content creation.
+      const prompt = llmPrompt`You are a social media trends analyst. Identify 8 trending topics for ${timeFrameText} that would be perfect for social media content creation.
 
 For each topic, provide:
 - The topic name (concise)
@@ -80,7 +81,7 @@ Return ONLY valid JSON with the following structure:
 
 Make topics diverse across categories and genuinely reflect current events and cultural moments.`
 
-      const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+      const response = await callLLM(prompt, 'gpt-4o-mini', true)
       const data = JSON.parse(response)
 
       if (data.topics && Array.isArray(data.topics)) {

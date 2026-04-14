@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import {
   AutoDiscoverySettings,
   DEFAULT_AUTO_DISCOVERY_SETTINGS,
@@ -13,7 +13,7 @@ import { ContentIdea } from '@/lib/types'
 export function useAutoDiscovery(
   onNewContent?: (content: ContentIdea[]) => void
 ) {
-  const [settings, setSettings] = useKV<AutoDiscoverySettings>(
+  const [settings, setSettings] = useLocalStorage<AutoDiscoverySettings>(
     'auto-discovery-settings',
     DEFAULT_AUTO_DISCOVERY_SETTINGS
   )

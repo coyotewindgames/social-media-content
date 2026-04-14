@@ -1,4 +1,6 @@
 import { Platform, SocialAccount, PostingResult } from './types'
+import { llmPrompt, callLLM } from './llm'
+import { kvStorage } from '@/hooks/use-local-storage'
 
 export interface PostData {
   caption: string
@@ -93,7 +95,7 @@ export class SocialMediaAPI {
     const state = generateState()
     const codeVerifier = generateCodeVerifier()
     
-    await window.spark.kv.set(`oauth_state_${state}`, { platform, codeVerifier, timestamp: Date.now() })
+    await kvStorage.set(`oauth_state_${state}`, { platform, codeVerifier, timestamp: Date.now() })
     
     let authUrl = ''
     
@@ -165,13 +167,13 @@ export class SocialMediaAPI {
     refreshToken?: string
     expiresIn?: number
   }> {
-    const stateData = await window.spark.kv.get<{ platform: Platform; codeVerifier: string; timestamp: number }>(`oauth_state_${state}`)
+    const stateData = await kvStorage.get<{ platform: Platform; codeVerifier: string; timestamp: number }>(`oauth_state_${state}`)
     
     if (!stateData) {
       throw new Error('Invalid OAuth state')
     }
     
-    await window.spark.kv.delete(`oauth_state_${state}`)
+    await kvStorage.delete(`oauth_state_${state}`)
     
     if (Date.now() - stateData.timestamp > 600000) {
       throw new Error('OAuth state expired')
@@ -191,9 +193,9 @@ export class SocialMediaAPI {
     codeVerifier?: string
   ): Promise<{ accessToken: string; refreshToken?: string; expiresIn?: number }> {
     const timestamp = Date.now()
-    const prompt = window.spark.llmPrompt`Generate a mock OAuth token response for ${platform}. Return a JSON object with these fields: accessToken (string starting with "mock_${platform}_"), refreshToken (string starting with "refresh_${platform}_"), expiresIn (number 3600). Make the tokens look realistic with random alphanumeric characters. Return ONLY valid JSON.`
+    const prompt = llmPrompt`Generate a mock OAuth token response for ${platform}. Return a JSON object with these fields: accessToken (string starting with "mock_${platform}_"), refreshToken (string starting with "refresh_${platform}_"), expiresIn (number 3600). Make the tokens look realistic with random alphanumeric characters. Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
   }
 
@@ -204,9 +206,9 @@ export class SocialMediaAPI {
   }> {
     const timestamp = Date.now()
     const seed = Math.floor(Math.random() * 10000)
-    const prompt = window.spark.llmPrompt`Generate a realistic mock user profile for ${platform}. Return a JSON object with: username (string, lowercase, no spaces, like "${platform}user${seed}"), displayName (string, a real-sounding name), profileImageUrl (string, use "https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}"). Return ONLY valid JSON.`
+    const prompt = llmPrompt`Generate a realistic mock user profile for ${platform}. Return a JSON object with: username (string, lowercase, no spaces, like "${platform}user${seed}"), displayName (string, a real-sounding name), profileImageUrl (string, use "https://api.dicebear.com/7.x/avataaars/svg?seed=${seed}"). Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
   }
 
@@ -216,9 +218,9 @@ export class SocialMediaAPI {
     postData: PostData
   ): Promise<PostingResult> {
     try {
-      const prompt = window.spark.llmPrompt`You are simulating a social media posting API response for ${platform}. The content being posted - Caption: ${postData.caption}, Has Image: ${!!postData.imageUrl}, Has Video: ${!!postData.videoUrl}. Simulate a successful post and return JSON with: success (true), postUrl (string like "https://${platform}.com/${account.username}/post/${Date.now()}"), platformPostId (string like "post_${Date.now()}"). Return ONLY valid JSON.`
+      const prompt = llmPrompt`You are simulating a social media posting API response for ${platform}. The content being posted - Caption: ${postData.caption}, Has Image: ${!!postData.imageUrl}, Has Video: ${!!postData.videoUrl}. Simulate a successful post and return JSON with: success (true), postUrl (string like "https://${platform}.com/${account.username}/post/${Date.now()}"), platformPostId (string like "post_${Date.now()}"). Return ONLY valid JSON.`
 
-      const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+      const response = await callLLM(prompt, 'gpt-4o-mini', true)
       const result = JSON.parse(response)
       
       return {
@@ -241,9 +243,9 @@ export class SocialMediaAPI {
     scheduledTime: Date
   ): Promise<PostingResult> {
     try {
-      const prompt = window.spark.llmPrompt`You are simulating a social media scheduling API response for ${platform}. The content being scheduled - Caption: ${postData.caption}, Scheduled Time: ${scheduledTime.toISOString()}. Simulate a successful schedule and return JSON with: success (true), postUrl (string like "https://${platform}.com/${account.username}/scheduled/${Date.now()}"), platformPostId (string like "scheduled_${Date.now()}"). Return ONLY valid JSON.`
+      const prompt = llmPrompt`You are simulating a social media scheduling API response for ${platform}. The content being scheduled - Caption: ${postData.caption}, Scheduled Time: ${scheduledTime.toISOString()}. Simulate a successful schedule and return JSON with: success (true), postUrl (string like "https://${platform}.com/${account.username}/scheduled/${Date.now()}"), platformPostId (string like "scheduled_${Date.now()}"). Return ONLY valid JSON.`
 
-      const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+      const response = await callLLM(prompt, 'gpt-4o-mini', true)
       const result = JSON.parse(response)
       
       return {
@@ -263,9 +265,9 @@ export class SocialMediaAPI {
     platform: Platform,
     refreshToken: string
   ): Promise<{ accessToken: string; expiresIn: number }> {
-    const prompt = window.spark.llmPrompt`Simulate an OAuth token refresh for ${platform}. Return JSON with: accessToken (string like "refreshed_token_${Date.now()}"), expiresIn (number 3600). Return ONLY valid JSON.`
+    const prompt = llmPrompt`Simulate an OAuth token refresh for ${platform}. Return JSON with: accessToken (string like "refreshed_token_${Date.now()}"), expiresIn (number 3600). Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
   }
 
@@ -280,9 +282,9 @@ export class SocialMediaAPI {
     views: number
     reach: number
   }> {
-    const prompt = window.spark.llmPrompt`Simulate analytics data for a ${platform} post with ID: ${postId}. Generate realistic engagement metrics and return JSON with: likes (random 10-1000), comments (random 0-100), shares (random 0-50), views (random 100-10000), reach (random 200-15000). Return ONLY valid JSON.`
+    const prompt = llmPrompt`Simulate analytics data for a ${platform} post with ID: ${postId}. Generate realistic engagement metrics and return JSON with: likes (random 10-1000), comments (random 0-100), shares (random 0-50), views (random 100-10000), reach (random 200-15000). Return ONLY valid JSON.`
 
-    const response = await window.spark.llm(prompt, 'gpt-4o-mini', true)
+    const response = await callLLM(prompt, 'gpt-4o-mini', true)
     return JSON.parse(response)
   }
 

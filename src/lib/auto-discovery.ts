@@ -1,5 +1,6 @@
 import { ContentIdea, Platform, CaptionTone } from './types'
 import { generateImageWithGrok, hasGrokApiKey } from './grok-image-generation'
+import { llmPrompt, callLLM } from './llm'
 
 export interface TrendingTopic {
   topic: string
@@ -56,7 +57,7 @@ export async function fetchTrendingTopics(
     ? `Focus on these categories: ${categories.join(', ')}.` 
     : ''
 
-  const prompt = window.spark.llmPrompt`You are a social media trends analyst with access to real-time news and cultural events. Today is ${dayOfWeek}, ${dateStr}.
+  const prompt = llmPrompt`You are a social media trends analyst with access to real-time news and cultural events. Today is ${dayOfWeek}, ${dateStr}.
 
 Identify ${maxTopics} SPECIFIC trending topics, news stories, or cultural moments happening RIGHT NOW (${timeFrameText}) that would be perfect for social media content creation.
 
@@ -100,7 +101,7 @@ Examples of BAD topics (too generic):
 - "Concert Tours"
 - "Social Media Apps"`
 
-  const response = await window.spark.llm(prompt, 'gpt-4o', true)
+  const response = await callLLM(prompt, 'gpt-4o', true)
   const data = JSON.parse(response)
 
   if (data.topics && Array.isArray(data.topics)) {
@@ -119,7 +120,7 @@ export async function generateContentFromTopic(
 ): Promise<Omit<ContentIdea, 'id' | 'createdAt' | 'updatedAt'>> {
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   
-  const prompt = window.spark.llmPrompt`You are a viral social media content strategist creating timely, news-driven content. Create a compelling ${platform} post based on this CURRENT trending topic:
+  const prompt = llmPrompt`You are a viral social media content strategist creating timely, news-driven content. Create a compelling ${platform} post based on this CURRENT trending topic:
 
 Topic: ${topic.topic}
 Category: ${topic.category}
@@ -151,7 +152,7 @@ Return ONLY valid JSON:
   "caption": "Opening hook about the news... Context and why it matters. Relevant #hashtags"
 }`
 
-  const response = await window.spark.llm(prompt, 'gpt-4o', true)
+  const response = await callLLM(prompt, 'gpt-4o', true)
   const data = JSON.parse(response)
 
   const contentIdea: Omit<ContentIdea, 'id' | 'createdAt' | 'updatedAt'> = {
