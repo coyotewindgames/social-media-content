@@ -155,15 +155,13 @@ app.post('/api/pipeline/run', (req, res) => {
     platforms = body.platforms as Platform[];
   }
 
-  // Validate tone
+  // Tone is deprecated — persona voice replaces it, but accept for backward compat
   let tone: Tone | undefined;
   if (body.tone) {
     const validTones = Object.values(Tone) as string[];
-    if (!validTones.includes(body.tone)) {
-      res.status(400).json({ error: `Invalid tone: ${body.tone}` });
-      return;
+    if (validTones.includes(body.tone)) {
+      tone = body.tone as Tone;
     }
-    tone = body.tone as Tone;
   }
 
   const runOptions: RunOptions = {
@@ -363,6 +361,12 @@ app.post('/api/pipeline/approve/:postId', async (req, res) => {
 app.get('/api/pipeline/history', async (_req, res) => {
   const history = await orchestrator.getHistory(20);
   res.json(history);
+});
+
+// ─── Persona management (hardcoded Allen Sharpe) ─────────────────────────────
+
+app.get('/api/persona', (_req, res) => {
+  res.json(orchestrator.getActivePersona());
 });
 
 // ─── Production: serve frontend static files ────────────────────────────────

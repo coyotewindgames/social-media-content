@@ -163,3 +163,52 @@ export async function listPipelineRuns(limit = 50): Promise<RunSummary[]> {
 export async function getPipelineHistory(): Promise<unknown[]> {
   return apiFetch<unknown[]>('/pipeline/history')
 }
+
+// ─── Persona types ───────────────────────────────────────────────────────────
+
+export interface PersonaVoice {
+  tone: string
+  vocabulary_level: string
+  sentence_style: string
+  rhetorical_devices: string[]
+  humor_style: string
+}
+
+export interface PersonaBeliefs {
+  core_values: string[]
+  worldview: string
+  policy_leanings: string
+  red_lines: string[]
+}
+
+export interface PersonaStyleRules {
+  emoji_usage: string
+  hashtag_style: string
+  cta_patterns: string[]
+  signature_phrases: string[]
+  opening_patterns: string[]
+}
+
+export interface PersonaProfile {
+  id: string
+  name: string
+  isActive: boolean
+  voice: PersonaVoice
+  beliefs: PersonaBeliefs
+  styleRules: PersonaStyleRules
+  taboos: string[]
+  examplePosts: string[]
+  metadata: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── Persona API (hardcoded Allen Sharpe — read-only) ────────────────────────
+
+export async function getActivePersona(): Promise<PersonaProfile | null> {
+  try {
+    return await apiFetch<PersonaProfile>('/persona')
+  } catch {
+    return null
+  }
+}

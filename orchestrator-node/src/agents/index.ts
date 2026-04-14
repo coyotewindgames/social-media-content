@@ -7,3 +7,5 @@ export { NewsAgent } from './newsAgent';
 export { ContentAgent } from './contentAgent';
 export { ImageAgent } from './imageAgent';
 export { PublishAgent } from './publishAgent';
+export { RankingAgent } from './rankingAgent';
+export { PersonaAgent } from './personaAgent';

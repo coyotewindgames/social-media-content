@@ -6,16 +6,18 @@ import {
   getPipelineStatus,
   getPipelineResult,
   listPipelineRuns,
+  getActivePersona,
   type ConfigStatus,
   type RunSummary,
   type PipelineResult,
   type RunPipelineOptions,
   type OrchestratorPlatform,
-  type OrchestratorTone,
+  type PersonaProfile,
   type SocialPost,
   type ImageSet,
   type PartialResults,
 } from '@/lib/orchestrator-api'
+import { PersonaSettingsDialog } from '@/components/PersonaSettingsDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,6 +49,8 @@ import {
   Hash,
   Clock,
   LinkSimple,
+  UserCircle,
+  Gear,
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -208,9 +212,11 @@ function ContentPostCard({
           <Badge className={`${PLATFORM_COLORS[post.platform] || ''} ${compact ? 'text-[10px] px-1.5 py-0' : ''}`}>
             {post.platform}
           </Badge>
-          <Badge variant="outline" className={`capitalize ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
-            {post.tone}
-          </Badge>
+          {post.tone && (
+            <Badge variant="outline" className={`capitalize ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
+              {post.tone}
+            </Badge>
+          )}
           {post.generatedBy && (
             <Badge variant="outline" className={`bg-violet-500/10 text-violet-600 border-violet-500/20 ${compact ? 'text-[10px] px-1.5 py-0' : 'text-xs'}`}>
               {post.generatedBy}
@@ -464,8 +470,11 @@ export function PipelineDashboard() {
 
   // Run options
   const [selectedPlatform, setSelectedPlatform] = useState<OrchestratorPlatform | 'all'>('all')
-  const [selectedTone, setSelectedTone] = useState<OrchestratorTone>('professional')
   const [dryRun, setDryRun] = useState(true)
+
+  // Persona
+  const [activePersona, setActivePersona] = useState<PersonaProfile | null>(null)
+  const [personaDialogOpen, setPersonaDialogOpen] = useState(false)
 
   // ─── Check backend connectivity ──────────────────────────────────────────
 
@@ -473,10 +482,14 @@ export function PipelineDashboard() {
     const ok = await checkHealth()
     setConnected(ok)
     if (ok) {
-      const cfg = await getConfigStatus()
+      const [cfg, allRuns, persona] = await Promise.all([
+        getConfigStatus(),
+        listPipelineRuns(),
+        getActivePersona(),
+      ])
       setConfigStatus(cfg)
-      const allRuns = await listPipelineRuns()
       setRuns(allRuns)
+      setActivePersona(persona)
     }
   }, [])
 
@@ -551,7 +564,6 @@ export function PipelineDashboard() {
     }
     const options: RunPipelineOptions = {
       platforms: selectedPlatform === 'all' ? undefined : [selectedPlatform],
-      tone: selectedTone,
       dryRun,
     }
     try {
@@ -704,17 +716,21 @@ export function PipelineDashboard() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Tone</Label>
-              <Select value={selectedTone} onValueChange={(v) => setSelectedTone(v as OrchestratorTone)}>
-                <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="professional">Professional</SelectItem>
-                  <SelectItem value="casual">Casual</SelectItem>
-                  <SelectItem value="playful">Playful</SelectItem>
-                  <SelectItem value="inspirational">Inspirational</SelectItem>
-                  <SelectItem value="informative">Informative</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label className="text-sm">Persona</Label>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-violet-500/10 text-violet-600 border-violet-500/20 text-sm py-1 px-3">
+                  <UserCircle size={16} weight="duotone" className="mr-1.5" />
+                  {activePersona?.name ?? 'Allen Sharpe'}
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPersonaDialogOpen(true)}
+                >
+                  <Gear size={14} className="mr-1" />
+                  View
+                </Button>
+              </div>
             </div>
             <div className="flex items-center gap-2 pb-0.5">
               <Switch id="dry-run" checked={dryRun} onCheckedChange={setDryRun} />
@@ -724,7 +740,7 @@ export function PipelineDashboard() {
               onClick={handleRunPipeline}
               disabled={!!activeRunId}
               size="lg"
-              className="bg-gradient-to-r from-accent to-primary text-white hover:opacity-90 transition-opacity"
+              className="bg-linear-to-r from-accent to-primary text-white hover:opacity-90 transition-opacity"
             >
               {activeRunId ? (
                 <><CircleNotch size={20} className="animate-spin mr-2" />Running...</>
@@ -748,7 +764,7 @@ export function PipelineDashboard() {
         }
 
         // Calculate progress percentage
-        const statuses = ['news_agent', 'content_agent', 'image_agent', 'publish_agent']
+        const statuses = ['news_agent', 'ranking_agent', 'content_agent', 'image_agent', 'publish_agent']
         const completedCount = statuses.filter((a) => {
           const s = agentStatus(a)
           return s === 'success' || s === 'failed'
@@ -761,6 +777,11 @@ export function PipelineDashboard() {
         const newsDetail = partial && partial.newsCount > 0
           ? `Found ${partial.newsCount} article${partial.newsCount !== 1 ? 's' : ''}`
           : agentStatus('news_agent') === 'running' ? 'Scanning sources…' : undefined
+        const rankingDetail = agentStatus('ranking_agent') === 'running'
+          ? 'Evaluating postworthiness…'
+          : agentStatus('ranking_agent') === 'success'
+            ? 'Top articles selected'
+            : undefined
         const contentDetail = partial && partial.postCount > 0
           ? `${partial.postCount} post${partial.postCount !== 1 ? 's' : ''} generated`
           : agentStatus('content_agent') === 'running' ? 'Writing posts…' : undefined
@@ -776,7 +797,7 @@ export function PipelineDashboard() {
             {/* Progress bar along the top */}
             <div className="h-1 bg-muted">
               <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-primary"
+                className="h-full bg-linear-to-r from-blue-500 to-primary"
                 initial={{ width: 0 }}
                 animate={{ width: `${progressPct}%` }}
                 transition={{ duration: 0.5, ease: 'easeOut' }}
@@ -796,6 +817,7 @@ export function PipelineDashboard() {
                 {/* Left: vertical stepper */}
                 <div className="space-y-0">
                   <AgentStep label="Fetching News" icon={Newspaper} status={agentStatus('news_agent')} detail={newsDetail} />
+                  <AgentStep label="Ranking Articles" icon={Scales} status={agentStatus('ranking_agent')} detail={rankingDetail} />
                   <AgentStep label="Generating Content" icon={Lightning} status={agentStatus('content_agent')} detail={contentDetail} />
                   <AgentStep label="Creating Images" icon={ImageSquare} status={agentStatus('image_agent')} detail={imageDetail} />
                   <AgentStep label="Publishing" icon={PaperPlaneTilt} status={agentStatus('publish_agent')} detail={publishDetail} isLast />
@@ -902,7 +924,7 @@ export function PipelineDashboard() {
             <h3 className="text-lg font-semibold">Recent Runs</h3>
             <div className="flex items-center gap-2">
               {compareIds.length >= 2 && (
-                <Button size="sm" onClick={handleStartCompare} className="bg-gradient-to-r from-accent to-primary text-white">
+                <Button size="sm" onClick={handleStartCompare} className="bg-linear-to-r from-accent to-primary text-white">
                   <Scales size={16} className="mr-1.5" />
                   Compare {compareIds.length} Runs
                 </Button>
@@ -939,6 +961,12 @@ export function PipelineDashboard() {
           </p>
         </div>
       )}
+
+      {/* ── Persona Settings Dialog ── */}
+      <PersonaSettingsDialog
+        open={personaDialogOpen}
+        onClose={() => setPersonaDialogOpen(false)}
+      />
     </div>
   )
 }
