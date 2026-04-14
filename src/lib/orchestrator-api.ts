@@ -18,6 +18,12 @@ export interface NewsItem {
   relevanceScore: number
 }
 
+export interface CarouselSlide {
+  slideNumber: number
+  text: string
+  imagePrompt: string
+}
+
 export interface SocialPost {
   postId: string
   content: string
@@ -29,6 +35,7 @@ export interface SocialPost {
   characterCount: number
   newsSource?: string
   generatedBy?: string
+  carouselSlides?: CarouselSlide[]
   createdAt: string
 }
 

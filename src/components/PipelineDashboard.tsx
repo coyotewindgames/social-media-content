@@ -23,6 +23,13 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext,
+} from '@/components/ui/carousel'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -191,7 +198,10 @@ function ContentPostCard({
   runLabel?: string
   compact?: boolean
 }) {
+  const slides = post.carouselSlides
+  const hasCarousel = slides && slides.length > 0 && imageSet && imageSet.images.length > 1
   const image = imageSet?.images?.[0]
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -199,12 +209,44 @@ function ContentPostCard({
       exit={{ opacity: 0, y: -12 }}
       className={`border rounded-xl overflow-hidden bg-card shadow-sm hover:shadow-md transition-shadow ${compact ? 'text-[0.8rem]' : ''}`}
     >
-      {image && image.url && !image.url.startsWith('data:') && (
-        <img
-          src={image.url}
-          alt={image.altText || 'Generated image'}
-          className={`w-full object-cover ${compact ? 'h-28' : 'h-44'}`}
-        />
+      {/* Carousel Slides */}
+      {hasCarousel ? (
+        <Carousel className="w-full" opts={{ loop: true }}>
+          <CarouselContent>
+            {slides!.map((slide, idx) => {
+              const slideImage = imageSet!.images[idx]
+              return (
+                <CarouselItem key={slide.slideNumber}>
+                  <div className="relative">
+                    {slideImage && slideImage.url && !slideImage.url.startsWith('data:') && (
+                      <img
+                        src={slideImage.url}
+                        alt={slideImage.altText || `Slide ${slide.slideNumber}`}
+                        className={`w-full object-cover ${compact ? 'h-28' : 'h-52'}`}
+                      />
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/70 to-transparent p-3">
+                      <p className="text-white text-sm leading-snug">{slide.text}</p>
+                    </div>
+                    <Badge className="absolute top-2 left-2 bg-black/50 text-white border-none text-[10px]">
+                      {slide.slideNumber} / {slides!.length}
+                    </Badge>
+                  </div>
+                </CarouselItem>
+              )
+            })}
+          </CarouselContent>
+          <CarouselPrevious className="left-1" />
+          <CarouselNext className="right-1" />
+        </Carousel>
+      ) : (
+        image && image.url && !image.url.startsWith('data:') && (
+          <img
+            src={image.url}
+            alt={image.altText || 'Generated image'}
+            className={`w-full object-cover ${compact ? 'h-28' : 'h-44'}`}
+          />
+        )
       )}
       <div className={compact ? 'p-3 space-y-2' : 'p-5 space-y-3'}>
         {/* Header badges */}

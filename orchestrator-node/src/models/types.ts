@@ -103,6 +103,13 @@ export interface NewsItem {
   rankingReason?: string;
 }
 
+// Instagram carousel slide
+export interface CarouselSlide {
+  slideNumber: number;
+  text: string;
+  imagePrompt: string;
+}
+
 // Generated social media post content
 export interface SocialPost {
   postId: string;
@@ -117,6 +124,8 @@ export interface SocialPost {
   newsSource?: string;
   generatedBy?: string;
   personaId?: string;
+  /** Instagram carousel slides. When present, each slide gets its own image. */
+  carouselSlides?: CarouselSlide[];
   createdAt: Date;
 }
 

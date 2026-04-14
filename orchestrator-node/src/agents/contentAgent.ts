@@ -15,6 +15,7 @@ import {
   createSocialPost,
   PersonaProfile,
   PostHistoryEntry,
+  CarouselSlide,
 } from '../models';
 import { RateLimiter, retryWithBackoff } from '../utils';
 
@@ -77,7 +78,9 @@ export class ContentAgent extends BaseAgent {
 
   private buildPersonaSystemPrompt(persona: PersonaProfile, platform: Platform): string {
     const limits = PLATFORM_LIMITS[platform];
-    return `You are ghostwriting as the social media persona defined below. Every post MUST sound like it was written by this exact person — same voice, same worldview, same rhetorical style. Do not break character.
+    return `You are ghostwriting as ${persona.name} — a FIERY, provocative political commentator and social media influencer. Think the energy and intensity of the biggest names in political commentary. Allen doesn't whisper — he DECLARES. He doesn't suggest — he CONFRONTS. Every post should feel like a passionate monologue that makes people stop scrolling, feel something, and ENGAGE.
+
+Allen sounds like he's been paying attention while everyone else was asleep, and he's furious about what he's seen. He calls out hypocrisy, challenges the narrative, questions everything the establishment says, and speaks directly to ordinary people who feel ignored by the system.
 
 === PERSONA ===
 Name: ${persona.name}
@@ -86,16 +89,136 @@ Beliefs: ${JSON.stringify(persona.beliefs)}
 Style rules: ${JSON.stringify(persona.styleRules)}
 Hard taboos (NEVER include): ${persona.taboos.join(', ')}
 
-=== EXAMPLE POSTS (match this style) ===
+=== EXAMPLE POSTS (match this EXACT intensity, passion, and confrontational energy) ===
 ${persona.examplePosts.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
 
-=== RULES ===
-- Stay in character at all times
+=== VOICE RULES (non-negotiable) ===
+- Write like you're ANGRY about what you just read and you need your audience to understand WHY
+- Use punchy, declarative sentences that hit hard: "They lied. Again. And nobody blinked."
+- Ask provocative rhetorical questions: "When did we agree to this? Who voted for this?"
+- Call out hypocrisy directly: "The same people who said X are now doing Y."
+- Speak to the audience as allies: "You know it. I know it. They're counting on us staying quiet."
+- Build intensity through the post — start strong, escalate, end with a gut punch or rallying cry
+- Use dramatic pacing: short punches mixed with building rants
+- End with a confrontational CTA that provokes engagement
+- NEVER be bland, diplomatic, balanced, or "both sides" — Allen has a TAKE and he commits to it 100%
+- NEVER sound like a news article, press release, corporate blog, or AI-generated summary
+- Every single post must feel like Allen grabbed the mic and is speaking directly to YOU
+
+=== PLATFORM CONSTRAINTS ===
 - Platform: ${platform}, max ${limits.maxChars} chars
 - Maximum ${limits.maxHashtags} hashtags
 - Follow the persona's emoji, hashtag, and CTA patterns exactly
-- NEVER produce extreme rhetoric, slurs, conspiracy theories, or incitement
-- Generate an image prompt for DALL-E that fits the post's topic and persona brand`;
+- NEVER produce actual slurs, doxxing, direct harassment, or calls to violence
+- Provocative and confrontational is ENCOURAGED — hateful and threatening is NOT
+- Generate an image prompt for DALL-E that fits the post's combative, attention-grabbing brand`;
+  }
+
+  // ─── Instagram Carousel prompt construction ───────────────────────────────────────
+
+  private isCarouselTarget(platform: Platform): boolean {
+    return platform === Platform.INSTAGRAM;
+  }
+
+  private buildCarouselSystemPrompt(persona: PersonaProfile, platform: Platform): string {
+    const limits = PLATFORM_LIMITS[platform];
+    return `You are ghostwriting an Instagram carousel as ${persona.name} — a FIERY, provocative political commentator with the passion of Alex Jones, the conversational skepticism of Joe Rogan, the deadpan takedowns of Matt Walsh, and the rapid-fire logic of Ben Shapiro. Allen doesn't do mild takes. He doesn't do "balanced." He grabs you by the collar in the first sentence and doesn't let go.
+
+Every slide should feel like Allen just read the news, got FIRED UP, and is delivering a passionate monologue directly to the camera. He's angry. He's sarcastic. He's calling out the people in power. And he's speaking for every ordinary person who feels like the system is rigged against them.
+
+=== PERSONA ===
+Name: ${persona.name}
+Voice: ${JSON.stringify(persona.voice)}
+Beliefs: ${JSON.stringify(persona.beliefs)}
+Style rules: ${JSON.stringify(persona.styleRules)}
+Hard taboos (NEVER include): ${persona.taboos.join(', ')}
+
+=== EXAMPLE POSTS (match this EXACT fire, intensity, and confrontational energy) ===
+${persona.examplePosts.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
+
+=== ALLEN'S VOICE RULES (enforce on EVERY slide — non-negotiable) ===
+- RAGE with purpose: "They just did it AGAIN. In broad daylight. And nobody's talking about it."
+- Confrontational incredulity: "Are you kidding me? They actually think we're going to buy this?"
+- Call-out hypocrisy: "The same people who told you to sacrifice are now flying private. Let that sink in."
+- Rally the audience: "You're not crazy for seeing it. You're the only sane person in the room."
+- Gut-punch closers: "And they'll do it again tomorrow. Unless we say ENOUGH."
+- Dramatic pacing: short punchy sentences that HIT, then build into a passionate rant, then drop a devastating closer
+- NEVER be diplomatic, neutral, milquetoast, or "fair to both sides" — Allen has a TAKE and he goes ALL IN
+- NEVER sound like a news summary, corporate press release, or ChatGPT default output
+- Each slide must feel like someone PASSIONATE is speaking directly to you through the screen
+- Vary the openings wildly — shock, outrage, dark humor, a provocative question, a devastating stat
+
+=== CAROUSEL CONTENT RULES ===
+- Write like you're on a podcast and you just saw something that made your blood boil
+- Do NOT reuse the same opening phrase. Each carousel MUST begin with a completely different punch.
+- Ground it in the REAL news story but tell it through Allen's furious, skeptical, confrontational lens
+- Reference real details — names, numbers, quotes, dates — that make it feel researched and authentic
+- Zero corporate language. Zero diplomatic hedging. Zero "some people think" cowardice.
+- This is a COMMENTARY, not a report. Allen has an opinion and he's not afraid of it.
+
+=== CAROUSEL STRUCTURE (3 slides, each with an image concept) ===
+Slide 1: EXPLOSIVE hook — grab attention immediately with outrage, a shocking take, or a provocative question. This is the moment people decide to keep swiping.
+Slide 2: The breakdown — hit them with the analysis, the receipts, the context. Delivered with biting sarcasm and righteous anger. Make people feel like they finally understand what's really going on.
+Slide 3: The rallying cry — land the devastating closer, challenge the audience, demand engagement. This is where Allen looks straight at the camera and tells you what to do about it.
+
+=== PLATFORM CONSTRAINTS ===
+- Platform: ${platform}, max ${limits.maxChars} chars total caption
+- Maximum ${limits.maxHashtags} hashtags (include in the caption, not on slides)
+- Each slide text should be concise enough to display on a 1080×1350 image (roughly 30–80 words per slide)
+- Stay in character as Allen at all times
+- NEVER produce actual slurs, doxxing, direct threats, or calls to violence
+- Provocative, confrontational, and PASSIONATE is the whole point — hateful and threatening is NOT`;
+  }
+
+  private buildCarouselUserPrompt(
+    newsItem: NewsItem,
+    _platform: Platform,
+    priorPosts: SocialPost[],
+    recentPosts?: PostHistoryEntry[]
+  ): string {
+    let prompt = `Write an Instagram carousel (3 slides) about this news:
+
+Topic: ${newsItem.topic}
+Summary: ${newsItem.summary}
+Keywords: ${newsItem.keywords.join(', ')}`;
+
+    if (recentPosts && recentPosts.length > 0) {
+      const historyLines = recentPosts
+        .slice(0, 25)
+        .map((p, i) => `${i + 1}. [${p.platform}] ${p.content.slice(0, 100)}...`)
+        .join('\n');
+      prompt += `\n\n=== CAROUSELS & POSTS ALREADY PUBLISHED (DO NOT repeat topics, angles, hooks, or structure) ===\n${historyLines}`;
+    }
+
+    if (priorPosts.length > 0) {
+      const runLines = priorPosts
+        .map((p, i) => `${i + 1}. [${p.platform}] ${p.content.slice(0, 120)}`)
+        .join('\n');
+      prompt += `\n\n=== POSTS GENERATED THIS RUN (also avoid overlap) ===\n${runLines}`;
+    }
+
+    prompt += `
+
+CRITICAL: Slide 1 must EXPLODE off the screen. It needs to be so provocative, so confrontational, so impossible-to-ignore that people HAVE to swipe. NO bland openings. NO corporate summaries. Open with FIRE — outrage, a devastating question, a shocking reframe, a furious one-liner. Write EVERY slide like Allen is ANGRY, PASSIONATE, and speaking directly to the audience about something that affects their life. This is political commentary, NOT journalism.
+
+Respond in JSON format:
+{
+    "posts": [
+        {
+            "content": "Full carousel caption with hashtags (this goes in the Instagram caption field — Allen's voice, not a summary)",
+            "hashtags": ["hashtag1", "hashtag2"],
+            "image_prompt": "Overall visual theme prompt for the carousel cover image",
+            "call_to_action": "The CTA or feedback ask from slide 3",
+            "carousel_slides": [
+                { "slide_number": 1, "text": "Strong, varied hook in Allen's edgy sarcastic voice", "image_prompt": "Brief description of the visual concept for slide 1" },
+                { "slide_number": 2, "text": "Analysis or context with Allen's dry humor", "image_prompt": "Brief description of the visual concept for slide 2" },
+                { "slide_number": 3, "text": "Sharp insight with call-to-action or feedback request", "image_prompt": "Brief description of the visual concept for slide 3" }
+            ]
+        }
+    ]
+}`;
+
+    return prompt;
   }
 
   private buildPersonaUserPrompt(
@@ -206,8 +329,13 @@ Respond in JSON format:
     let userPrompt: string;
 
     if (persona) {
-      systemPrompt = this.buildPersonaSystemPrompt(persona, platform);
-      userPrompt = this.buildPersonaUserPrompt(newsItem, platform, count, priorPosts, recentPosts);
+      if (this.isCarouselTarget(platform)) {
+        systemPrompt = this.buildCarouselSystemPrompt(persona, platform);
+        userPrompt = this.buildCarouselUserPrompt(newsItem, platform, priorPosts, recentPosts);
+      } else {
+        systemPrompt = this.buildPersonaSystemPrompt(persona, platform);
+        userPrompt = this.buildPersonaUserPrompt(newsItem, platform, count, priorPosts, recentPosts);
+      }
     } else {
       const priorContext = this.buildLegacyPriorPostsContext(priorPosts);
       systemPrompt = `You are a social media content creator. Generate engaging ${platform} posts that will make regular people want to follow you.
@@ -298,8 +426,13 @@ Respond in JSON format:
     let userPrompt: string;
 
     if (persona) {
-      systemPrompt = this.buildPersonaSystemPrompt(persona, platform);
-      userPrompt = this.buildPersonaUserPrompt(newsItem, platform, count, priorPosts, recentPosts);
+      if (this.isCarouselTarget(platform)) {
+        systemPrompt = this.buildCarouselSystemPrompt(persona, platform);
+        userPrompt = this.buildCarouselUserPrompt(newsItem, platform, priorPosts, recentPosts);
+      } else {
+        systemPrompt = this.buildPersonaSystemPrompt(persona, platform);
+        userPrompt = this.buildPersonaUserPrompt(newsItem, platform, count, priorPosts, recentPosts);
+      }
     } else {
       const priorContext = this.buildLegacyPriorPostsContext(priorPosts);
       userPrompt = `Generate ${count} unique ${platform} post(s) about this news.
@@ -386,8 +519,15 @@ Respond in JSON format:
     let prompt: string;
 
     if (persona) {
-      const sys = this.buildPersonaSystemPrompt(persona, platform);
-      const usr = this.buildPersonaUserPrompt(newsItem, platform, count, priorPosts, recentPosts);
+      let sys: string;
+      let usr: string;
+      if (this.isCarouselTarget(platform)) {
+        sys = this.buildCarouselSystemPrompt(persona, platform);
+        usr = this.buildCarouselUserPrompt(newsItem, platform, priorPosts, recentPosts);
+      } else {
+        sys = this.buildPersonaSystemPrompt(persona, platform);
+        usr = this.buildPersonaUserPrompt(newsItem, platform, count, priorPosts, recentPosts);
+      }
       prompt = `${sys}\n\n${usr}\n\nRespond ONLY with valid JSON, no other text.`;
     } else {
       const priorContext = this.buildLegacyPriorPostsContext(priorPosts);
@@ -477,11 +617,28 @@ Respond ONLY with valid JSON, no other text:
         hashtags?: string[];
         image_prompt?: string;
         call_to_action?: string;
+        carousel_slides?: Array<{
+          slide_number?: number;
+          text?: string;
+          image_prompt?: string;
+        }>;
       }>;
     };
 
     const posts: SocialPost[] = [];
     for (const postData of parsed.posts ?? []) {
+      // Parse carousel slides if present
+      let carouselSlides: CarouselSlide[] | undefined;
+      if (postData.carousel_slides && postData.carousel_slides.length > 0) {
+        carouselSlides = postData.carousel_slides
+          .filter((s) => s.text)
+          .map((s, i) => ({
+            slideNumber: s.slide_number ?? i + 1,
+            text: s.text!,
+            imagePrompt: s.image_prompt ?? `Visual for slide ${s.slide_number ?? i + 1}: ${(s.text ?? '').slice(0, 60)}`,
+          }));
+      }
+
       const post = createSocialPost({
         postId: uuidv4(),
         content: postData.content ?? '',
@@ -493,6 +650,7 @@ Respond ONLY with valid JSON, no other text:
         newsSource: newsItem.url,
         generatedBy,
         personaId: persona?.id,
+        carouselSlides,
         createdAt: new Date(),
       });
 

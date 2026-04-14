@@ -72,6 +72,25 @@ export class ImageAgent extends BaseAgent {
     const dimensions = PLATFORM_DIMENSIONS[post.platform] ?? [{ width: 1024, height: 1024 }];
     const images: GeneratedImage[] = [];
 
+    // For carousel posts, generate one image per slide using each slide's prompt
+    if (post.carouselSlides && post.carouselSlides.length > 0) {
+      const carouselDim = dimensions.find((d) => d.width === 1080 && d.height === 1350) ?? dimensions[0];
+      this.logger.info(`Generating ${post.carouselSlides.length} carousel slide images for ${post.postId}`);
+
+      for (const slide of post.carouselSlides) {
+        try {
+          const image = await this.generateSingleImage(slide.imagePrompt, carouselDim);
+          images.push({ ...image, altText: `Slide ${slide.slideNumber}: ${slide.text.slice(0, 80)}` });
+        } catch (e) {
+          this.logger.warn(`Carousel slide ${slide.slideNumber} image failed, using fallback: ${e}`);
+          images.push(this.getUnsplashImage(carouselDim, slide.slideNumber));
+        }
+      }
+
+      return { postId: post.postId, images, createdAt: new Date() };
+    }
+
+    // Standard single-image flow
     for (let i = 0; i < count; i++) {
       const dim = dimensions[i % dimensions.length];
 
@@ -99,6 +118,20 @@ export class ImageAgent extends BaseAgent {
       images,
       createdAt: new Date(),
     };
+  }
+
+  /**
+   * Generate a single image using the best available provider.
+   */
+  private async generateSingleImage(prompt: string, dim: ImageDimensions): Promise<GeneratedImage> {
+    if (this.useGrok) {
+      return this.generateWithGrok(prompt, dim);
+    } else if (this.useDalle) {
+      return this.generateWithDalle(prompt, dim);
+    } else if (this.useStability) {
+      return this.generateWithStability(prompt, dim);
+    }
+    throw new Error('No image provider configured');
   }
 
   private async generateWithGrok(prompt: string, dimensions: ImageDimensions): Promise<GeneratedImage> {
