@@ -1,6 +1,8 @@
 /**
  * Frontend API client for the orchestrator backend.
- * All calls go through the Vite proxy at /api → localhost:3001.
+ * 
+ * In development, calls go through the Vite proxy at /api → localhost:3001.
+ * In production, set VITE_API_URL to the backend's public URL (e.g., https://api.example.com).
  */
 
 // ─── Shared types mirroring the backend models ──────────────────────────────
@@ -119,7 +121,14 @@ export interface RunPipelineOptions {
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
 
-const BASE = '/api'
+/**
+ * Base URL for the backend API.
+ * - In development: Uses Vite proxy at /api
+ * - In production: Set VITE_API_URL to the backend's public URL
+ *
+ * Example: VITE_API_URL=https://your-backend.railway.app/api
+ */
+const BASE = import.meta.env.VITE_API_URL || '/api'
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
