@@ -239,7 +239,7 @@ For production:
 
 ### State Parameter
 - Random state token prevents CSRF attacks
-- Stored in `spark.kv` with 10-minute expiration
+- Stored in localStorage with 10-minute expiration
 - Validated on callback
 
 ### PKCE (for Twitter)
@@ -248,7 +248,7 @@ For production:
 - Prevents authorization code interception attacks
 
 ### Token Storage
-- Access tokens stored in local browser storage via `spark.kv`
+- Access tokens stored in local browser storage via localStorage
 - Refresh tokens stored for automatic token renewal
 - Token expiration tracked and accounts marked as "expired" when needed
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import { SocialAccount, AccountAnalytics, Platform } from '@/lib/types'
 import { AnalyticsAPI } from '@/lib/analytics-api'
 import {
@@ -67,8 +67,8 @@ const platformColors: Record<Platform, string> = {
 }
 
 export function AccountComparisonDialog({ open, onClose }: AccountComparisonDialogProps) {
-  const [accounts] = useKV<SocialAccount[]>('social-accounts', [])
-  const [analytics, setAnalytics] = useKV<Record<string, AccountAnalytics>>('account-analytics', {})
+  const [accounts] = useLocalStorage<SocialAccount[]>('social-accounts', [])
+  const [analytics, setAnalytics] = useLocalStorage<Record<string, AccountAnalytics>>('account-analytics', {})
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([])
   const [timeRange, setTimeRange] = useState<'7' | '30' | '90'>('30')
   const [loading, setLoading] = useState(false)

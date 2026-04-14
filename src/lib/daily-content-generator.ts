@@ -2,6 +2,7 @@ import { ContentIdea, Platform, CaptionTone } from './types'
 import { fetchTrendingNews, TrendingTopic, NewsAPISettings } from './news-api'
 import { generateCaptionWithOllama } from './ollama-api'
 import { generateImageWithGrok } from './grok-image-generation'
+import { kvStorage } from '@/hooks/use-local-storage'
 
 export interface DailyContentGenerationOptions {
   count?: number
@@ -129,13 +130,13 @@ export function getDailyContentCacheKey(): string {
 
 export async function getCachedDailyContent(): Promise<ContentIdea[] | null> {
   const cacheKey = getDailyContentCacheKey()
-  const cached = await window.spark.kv.get<ContentIdea[]>(cacheKey)
+  const cached = await kvStorage.get<ContentIdea[]>(cacheKey)
   return cached || null
 }
 
 export async function cacheDailyContent(contents: ContentIdea[]): Promise<void> {
   const cacheKey = getDailyContentCacheKey()
-  await window.spark.kv.set(cacheKey, contents)
+  await kvStorage.set(cacheKey, contents)
 }
 
 export async function getOrGenerateDailyContent(

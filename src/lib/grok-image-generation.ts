@@ -1,3 +1,6 @@
+import { llmPrompt, callLLM } from './llm'
+import { kvStorage } from '@/hooks/use-local-storage'
+
 export interface GrokImageGenerationResult {
   success: boolean
   imageDataUrl?: string
@@ -75,7 +78,7 @@ async function createImagePrompt(
   description: string,
   platform: string
 ): Promise<string> {
-  const promptRequest = window.spark.llmPrompt`You are an expert at creating prompts for AI image generation. 
+  const promptRequest = llmPrompt`You are an expert at creating prompts for AI image generation. 
 
 Create a detailed, vivid image generation prompt based on this social media content:
 
@@ -95,7 +98,7 @@ Requirements:
 
 Return ONLY the prompt text, nothing else.`
 
-  const prompt = await window.spark.llm(promptRequest, 'gpt-4o-mini')
+  const prompt = await callLLM(promptRequest, 'gpt-4o-mini')
   return prompt.trim()
 }
 
@@ -111,15 +114,15 @@ function getPlatformImageSize(platform: string): string {
 }
 
 export async function getGrokApiKey(): Promise<string | undefined> {
-  return await window.spark.kv.get<string>('grok-api-key')
+  return (await kvStorage.get<string>('grok-api-key')) ?? undefined
 }
 
 export async function setGrokApiKey(apiKey: string): Promise<void> {
-  await window.spark.kv.set('grok-api-key', apiKey)
+  await kvStorage.set('grok-api-key', apiKey)
 }
 
 export async function deleteGrokApiKey(): Promise<void> {
-  await window.spark.kv.delete('grok-api-key')
+  await kvStorage.delete('grok-api-key')
 }
 
 export async function hasGrokApiKey(): Promise<boolean> {

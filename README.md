@@ -1,23 +1,91 @@
-# ✨ Welcome to Your Spark Template!
-You've just launched your brand-new Spark Template Codespace — everything’s fired up and ready for you to explore, build, and create with Spark!
+# Social Media Content Planner
 
-This template is your blank canvas. It comes with a minimal setup to help you get started quickly with Spark development.
+A powerful social media content planning and creation tool with AI-powered features for generating captions, analyzing trends, and managing multiple social media accounts.
 
-🚀 What's Inside?
-- A clean, minimal Spark environment
-- Pre-configured for local development
-- Ready to scale with your ideas
-  
-🧠 What Can You Do?
+## 🚀 Getting Started
 
-Right now, this is just a starting point — the perfect place to begin building and testing your Spark applications.
+### Prerequisites
 
-🧹 Just Exploring?
-No problem! If you were just checking things out and don’t need to keep this code:
+- Node.js 18+ 
+- npm or yarn
 
-- Simply delete your Spark.
-- Everything will be cleaned up — no traces left behind.
+### Installation
 
-📄 License For Spark Template Resources 
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd social-media-content
+```
 
-The Spark Template files and resources from GitHub are licensed under the terms of the MIT license, Copyright GitHub, Inc.
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Create a `.env.local` file for environment variables:
+```bash
+# Optional: OpenAI API key for AI features
+VITE_OPENAI_API_KEY=your_openai_api_key
+
+# Optional: Social media OAuth credentials (see OAUTH_SETUP.md)
+VITE_INSTAGRAM_CLIENT_ID=your_instagram_client_id
+VITE_FACEBOOK_CLIENT_ID=your_facebook_client_id
+VITE_TWITTER_CLIENT_ID=your_twitter_client_id
+VITE_TIKTOK_CLIENT_ID=your_tiktok_client_id
+VITE_YOUTUBE_CLIENT_ID=your_youtube_client_id
+```
+
+4. Start the development server:
+```bash
+npm run dev
+```
+
+The application will be available at `http://localhost:5173`
+
+## 📦 Features
+
+- **Content Planning**: Create, organize, and schedule social media content
+- **AI Caption Generation**: Generate engaging captions using AI
+- **Trending Topics Discovery**: Find trending topics for content inspiration
+- **Multi-Platform Support**: Instagram, TikTok, Facebook, Twitter, YouTube
+- **Analytics Dashboard**: Track performance across connected accounts
+- **Image Generation**: AI-powered image generation for posts
+- **Auto-Discovery**: Automatic content suggestions based on trends
+
+## 🔧 Configuration
+
+### AI Features
+
+To enable AI-powered features (caption generation, trending topics, etc.), set the `VITE_OPENAI_API_KEY` environment variable. Without this, the app will use placeholder responses.
+
+### Social Media Integration
+
+For connecting social media accounts, see [OAUTH_SETUP.md](./OAUTH_SETUP.md) for detailed instructions on setting up OAuth credentials for each platform.
+
+## 🛠️ Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+## 📁 Project Structure
+
+\`\`\`
+src/
+├── components/     # React components
+├── hooks/          # Custom React hooks
+├── lib/            # Utility functions and APIs
+├── styles/         # CSS styles
+└── App.tsx         # Main application component
+\`\`\`
+
+## 📄 License
+
+This project is licensed under the MIT License.
+
+## 📚 Additional Resources
+
+- [OAuth Setup Guide](./OAUTH_SETUP.md)
+- [Security Guidelines](./SECURITY.md)
+- [Product Requirements](./PRD.md)

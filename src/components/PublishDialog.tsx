@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useKV } from '@github/spark/hooks'
+import { useLocalStorage } from '@/hooks/use-local-storage'
 import { ContentIdea, SocialAccount } from '@/lib/types'
 import { SocialMediaAPI, PostData } from '@/lib/social-api'
 import {
@@ -30,7 +30,7 @@ interface PublishDialogProps {
 }
 
 export function PublishDialog({ content, open, onClose, onPublished }: PublishDialogProps) {
-  const [accounts] = useKV<SocialAccount[]>('social-accounts', [])
+  const [accounts] = useLocalStorage<SocialAccount[]>('social-accounts', [])
   const [publishing, setPublishing] = useState(false)
   const [progress, setProgress] = useState(0)
   const [result, setResult] = useState<{
