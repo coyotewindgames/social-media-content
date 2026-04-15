@@ -104,7 +104,16 @@ export class NewsAgent extends BaseAgent {
 
     return retryWithBackoff(
       async () => {
-        const query = keywords?.length ? keywords.join(' OR ') : 'technology OR business OR trending';
+        // Build a query from single meaningful words — multi-word persona phrases
+        // like "individual liberty" produce overly narrow NewsAPI results.
+        const queryTerms = keywords?.length
+          ? [...new Set(
+              keywords.flatMap((kw) =>
+                kw.toLowerCase().split(/\s+/).filter((w) => w.length > 3 && !STOPWORDS.has(w))
+              )
+            )].slice(0, 8)
+          : ['technology', 'business', 'trending'];
+        const query = queryTerms.join(' OR ');
         const url = new URL('https://newsapi.org/v2/everything');
         url.searchParams.set('q', query);
         url.searchParams.set('sortBy', 'publishedAt');
@@ -347,7 +356,7 @@ export class NewsAgent extends BaseAgent {
   private applyFilters(newsItems: NewsItem[], keywords?: string[]): NewsItem[] {
     const filtered: NewsItem[] = [];
     const seenTopics = new Set<string>();
-    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
 
     for (const item of newsItems) {
       // Simple deduplication
@@ -355,16 +364,17 @@ export class NewsAgent extends BaseAgent {
       if (seenTopics.has(topicKey)) continue;
       seenTopics.add(topicKey);
 
-      // Filter by recency (last 24 hours)
-      if (item.timestamp < dayAgo) continue;
+      // Filter by recency (last 48 hours — gives more runway for Reddit/HN posts)
+      if (item.timestamp < cutoff) continue;
 
-      // Filter by keywords if provided — match on individual words so
-      // multi-word phrases like "free markets" match articles about "markets"
+      // Keyword filtering is intentionally loose here — the ranking agent
+      // (LLM) handles persona-alignment and post-worthiness scoring.
+      // We only drop articles that share zero words with any keyword.
       if (keywords?.length) {
-        const itemText = `${item.topic} ${item.summary}`.toLowerCase();
+        const itemText = `${item.topic} ${item.summary} ${item.keywords.join(' ')}`.toLowerCase();
         const kwWords = new Set(
           keywords.flatMap((kw) =>
-            kw.toLowerCase().split(/\s+/).filter((w) => w.length > 1 && !STOPWORDS.has(w))
+            kw.toLowerCase().split(/\s+/).filter((w) => w.length > 2 && !STOPWORDS.has(w))
           )
         );
         if (![...kwWords].some((w) => itemText.includes(w))) {
