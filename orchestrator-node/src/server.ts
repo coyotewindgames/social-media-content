@@ -7,6 +7,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import * as dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Orchestrator, RunOptions, PipelineResult } from './orchestrator';
@@ -14,6 +15,11 @@ import { loadConfig } from './config';
 import { Platform, Tone } from './models';
 import { getLogger, setupLogging } from './utils';
 
+// Load .env from Render secret file path, then local .env (local values take precedence)
+const renderEnvPath = '/etc/secrets/.env';
+if (fs.existsSync(renderEnvPath)) {
+  dotenv.config({ path: renderEnvPath });
+}
 dotenv.config();
 
 const app = express();

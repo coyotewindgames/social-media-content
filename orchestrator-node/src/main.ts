@@ -6,13 +6,18 @@
 import { Command } from 'commander';
 import * as cron from 'node-cron';
 import * as dotenv from 'dotenv';
+import fs from 'fs';
 import { execSync, spawn } from 'child_process';
 import { Orchestrator, RunOptions } from './orchestrator';
 import { loadConfig } from './config';
 import { Platform, Tone } from './models';
 import { getLogger, setupLogging } from './utils';
 
-// Load environment variables
+// Load .env from Render secret file path, then local .env
+const renderEnvPath = '/etc/secrets/.env';
+if (fs.existsSync(renderEnvPath)) {
+  dotenv.config({ path: renderEnvPath });
+}
 dotenv.config();
 
 const program = new Command();
