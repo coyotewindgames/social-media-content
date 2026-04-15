@@ -375,6 +375,88 @@ app.get('/api/persona', (_req, res) => {
   res.json(orchestrator.getActivePersona());
 });
 
+// ─── Publish a single post to Instagram on demand ────────────────────────────
+// Accepts { caption, imageUrl } and uses the INSTAGRAM_ACCESS_TOKEN /
+// INSTAGRAM_BUSINESS_ID from the environment to publish via the Graph API.
+
+app.post('/api/publish/instagram', async (req, res) => {
+  const { caption, imageUrl } = req.body as { caption?: string; imageUrl?: string };
+
+  if (!caption) {
+    res.status(400).json({ error: 'caption is required' });
+    return;
+  }
+  if (!imageUrl) {
+    res.status(400).json({ error: 'imageUrl is required (Instagram requires an image)' });
+    return;
+  }
+  if (!config.instagramAccessToken || !config.instagramBusinessId) {
+    res.status(503).json({ error: 'Instagram credentials not configured (INSTAGRAM_ACCESS_TOKEN / INSTAGRAM_BUSINESS_ID)' });
+    return;
+  }
+
+  try {
+    // Step 1: Create media container
+    const containerUrl = new URL(
+      `https://graph.instagram.com/v18.0/${config.instagramBusinessId}/media`
+    );
+    containerUrl.searchParams.set('image_url', imageUrl);
+    containerUrl.searchParams.set('caption', caption);
+    containerUrl.searchParams.set('access_token', config.instagramAccessToken);
+
+    const containerRes = await fetch(containerUrl.toString(), {
+      method: 'POST',
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!containerRes.ok) {
+      const errText = await containerRes.text();
+      logger.error(`Instagram container creation failed: ${errText}`);
+      res.status(502).json({ error: `Instagram API error: ${errText}` });
+      return;
+    }
+
+    const containerData = (await containerRes.json()) as { id?: string };
+    const containerId = containerData.id;
+    if (!containerId) {
+      res.status(502).json({ error: 'Instagram did not return a container ID' });
+      return;
+    }
+
+    // Step 2: Publish the container
+    const publishUrl = new URL(
+      `https://graph.instagram.com/v18.0/${config.instagramBusinessId}/media_publish`
+    );
+    publishUrl.searchParams.set('creation_id', containerId);
+    publishUrl.searchParams.set('access_token', config.instagramAccessToken);
+
+    const publishRes = await fetch(publishUrl.toString(), {
+      method: 'POST',
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (!publishRes.ok) {
+      const errText = await publishRes.text();
+      logger.error(`Instagram publish failed: ${errText}`);
+      res.status(502).json({ error: `Instagram publish error: ${errText}` });
+      return;
+    }
+
+    const publishData = (await publishRes.json()) as { id?: string };
+    const mediaId = publishData.id ?? '';
+
+    logger.info(`Published to Instagram: mediaId=${mediaId}`);
+    res.json({
+      success: true,
+      mediaId,
+      postUrl: `https://www.instagram.com/p/${mediaId}`,
+    });
+  } catch (err) {
+    logger.error(`/api/publish/instagram error: ${err}`);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ─── Production: serve frontend static files ────────────────────────────────
 
 if (process.env.NODE_ENV === 'production') {

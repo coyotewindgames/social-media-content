@@ -228,3 +228,12 @@ export async function getActivePersona(): Promise<PersonaProfile | null> {
     return null
   }
 }
+
+// ─── Instagram publish ───────────────────────────────────────────────────────
+
+export async function publishToInstagram(caption: string, imageUrl: string): Promise<{ success: boolean; mediaId: string; postUrl: string }> {
+  return apiFetch<{ success: boolean; mediaId: string; postUrl: string }>('/publish/instagram', {
+    method: 'POST',
+    body: JSON.stringify({ caption, imageUrl }),
+  })
+}

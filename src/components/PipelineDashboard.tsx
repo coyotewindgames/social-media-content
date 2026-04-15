@@ -7,6 +7,7 @@ import {
   getPipelineResult,
   listPipelineRuns,
   getActivePersona,
+  publishToInstagram,
   type ConfigStatus,
   type RunSummary,
   type PipelineResult,
@@ -58,6 +59,8 @@ import {
   LinkSimple,
   UserCircle,
   Gear,
+  InstagramLogo,
+  Upload,
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -201,6 +204,7 @@ function ContentPostCard({
   const slides = post.carouselSlides
   const hasCarousel = slides && slides.length > 0 && imageSet && imageSet.images.length > 1
   const image = imageSet?.images?.[0]
+  const [publishing, setPublishing] = useState(false)
 
   return (
     <motion.div
@@ -300,6 +304,35 @@ function ContentPostCard({
             </span>
           )}
         </div>
+
+        {/* Publish to Instagram */}
+        {image?.url && !image.url.startsWith('data:') && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-2 gap-1.5 text-pink-600 border-pink-500/30 hover:bg-pink-500/10"
+            disabled={publishing}
+            onClick={async () => {
+              setPublishing(true)
+              try {
+                const caption = `${post.content}\n\n${post.hashtags.map(t => `#${t}`).join(' ')}`
+                const res = await publishToInstagram(caption, image.url)
+                toast.success(`Published to Instagram! Media ID: ${res.mediaId}`)
+              } catch (err) {
+                toast.error(`Publish failed: ${err instanceof Error ? err.message : String(err)}`)
+              } finally {
+                setPublishing(false)
+              }
+            }}
+          >
+            {publishing ? (
+              <CircleNotch size={14} className="animate-spin" />
+            ) : (
+              <InstagramLogo size={14} weight="bold" />
+            )}
+            {publishing ? 'Publishing…' : 'Publish to Instagram'}
+          </Button>
+        )}
       </div>
     </motion.div>
   )
