@@ -38,6 +38,9 @@ export interface SocialPost {
   newsSource?: string
   generatedBy?: string
   carouselSlides?: CarouselSlide[]
+  refinedContent?: string
+  refinementNotes?: string
+  refinementPrompt?: string
   createdAt: string
 }
 
@@ -235,5 +238,18 @@ export async function publishToInstagram(caption: string, imageUrl: string): Pro
   return apiFetch<{ success: boolean; mediaId: string; postUrl: string }>('/publish/instagram', {
     method: 'POST',
     body: JSON.stringify({ caption, imageUrl }),
+  })
+}
+
+// ─── Content refinement (GPT-5.3) ───────────────────────────────────────────
+
+export async function refinePostContent(
+  pipelineId: string,
+  postId: string,
+  refinementPrompt: string,
+): Promise<{ success: boolean; refinedContent: string; notes: string }> {
+  return apiFetch<{ success: boolean; refinedContent: string; notes: string }>('/refine', {
+    method: 'POST',
+    body: JSON.stringify({ pipelineId, postId, refinementPrompt }),
   })
 }

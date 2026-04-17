@@ -375,6 +375,95 @@ app.get('/api/persona', (_req, res) => {
   res.json(orchestrator.getActivePersona());
 });
 
+// ─── Refine a post using GPT-5.3 ──────────────────────────────────────────────
+// Accepts { pipelineId, postId, refinementPrompt }, refines the post content
+// via GPT-5.3, and writes the result back to the pipeline_runs JSONB.
+
+import { refineContent } from './utils/refinementService';
+
+app.post('/api/refine', async (req, res) => {
+  const { pipelineId, postId, refinementPrompt } = req.body as {
+    pipelineId?: string;
+    postId?: string;
+    refinementPrompt?: string;
+  };
+
+  if (!pipelineId || !postId || !refinementPrompt) {
+    res.status(400).json({ error: 'pipelineId, postId, and refinementPrompt are all required' });
+    return;
+  }
+
+  if (!supabase) {
+    res.status(503).json({ error: 'Supabase is not configured' });
+    return;
+  }
+
+  try {
+    // 1. Load the pipeline run
+    const { data: run, error: fetchErr } = await supabase
+      .from('pipeline_runs')
+      .select('posts')
+      .eq('id', pipelineId)
+      .single();
+
+    if (fetchErr || !run) {
+      res.status(404).json({ error: `Pipeline run ${pipelineId} not found` });
+      return;
+    }
+
+    const posts = (run.posts ?? []) as Array<Record<string, unknown>>;
+    const postIndex = posts.findIndex((p) => p.postId === postId);
+
+    if (postIndex === -1) {
+      res.status(404).json({ error: `Post ${postId} not found in pipeline ${pipelineId}` });
+      return;
+    }
+
+    const post = posts[postIndex];
+    const contentToRefine = (post.refinedContent as string) || (post.content as string);
+    const platform = (post.platform as Platform) || Platform.TWITTER;
+    const persona = orchestrator.getActivePersona();
+
+    // 2. Call GPT-5.3
+    const result = await refineContent(
+      contentToRefine,
+      refinementPrompt,
+      platform,
+      persona,
+      config,
+    );
+
+    // 3. Update the post in the JSONB array
+    posts[postIndex] = {
+      ...post,
+      refinedContent: result.refinedContent,
+      refinementNotes: result.notes,
+      refinementPrompt,
+    };
+
+    const { error: updateErr } = await supabase
+      .from('pipeline_runs')
+      .update({ posts })
+      .eq('id', pipelineId);
+
+    if (updateErr) {
+      logger.error(`Supabase update failed: ${updateErr.message}`);
+      res.status(500).json({ error: updateErr.message });
+      return;
+    }
+
+    logger.info(`Refined post ${postId} in pipeline ${pipelineId}`);
+    res.json({
+      success: true,
+      refinedContent: result.refinedContent,
+      notes: result.notes,
+    });
+  } catch (err) {
+    logger.error(`/api/refine error: ${err}`);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 // ─── Publish a single post to Instagram on demand ────────────────────────────
 // Accepts { caption, imageUrl } and uses the INSTAGRAM_ACCESS_TOKEN /
 // INSTAGRAM_BUSINESS_ID from the environment to publish via the Graph API.

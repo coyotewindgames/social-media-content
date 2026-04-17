@@ -126,6 +126,12 @@ export interface SocialPost {
   personaId?: string;
   /** Instagram carousel slides. When present, each slide gets its own image. */
   carouselSlides?: CarouselSlide[];
+  /** GPT-5.3 refined version of content. Preferred over `content` by downstream agents. */
+  refinedContent?: string;
+  /** Brief explanation of improvements made during refinement. */
+  refinementNotes?: string;
+  /** The user-provided instruction that produced the refinement. */
+  refinementPrompt?: string;
   createdAt: Date;
 }
 

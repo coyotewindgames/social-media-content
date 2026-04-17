@@ -85,6 +85,8 @@ export interface Config {
   dryRunMode: boolean;
   requireApproval: boolean;
   enableAnalytics: boolean;
+  autoRefineEnabled: boolean;
+  autoRefinePrompt: string;
 }
 
 const defaultConfig: Config = {
@@ -119,6 +121,8 @@ const defaultConfig: Config = {
   dryRunMode: false,
   requireApproval: false,
   enableAnalytics: true,
+  autoRefineEnabled: false,
+  autoRefinePrompt: 'Improve clarity, flow, and impact while preserving the original voice and message.',
 };
 
 /**
@@ -160,6 +164,8 @@ export function loadConfig(configFile?: string): Config {
   if (process.env.LOG_DIR) config.logDir = process.env.LOG_DIR;
   if (process.env.DRY_RUN === 'true') config.dryRunMode = true;
   if (process.env.REQUIRE_APPROVAL === 'true') config.requireApproval = true;
+  if (process.env.AUTO_REFINE_ENABLED === 'true') config.autoRefineEnabled = true;
+  if (process.env.AUTO_REFINE_PROMPT) config.autoRefinePrompt = process.env.AUTO_REFINE_PROMPT;
   if (process.env.MAX_CANDIDATE_ARTICLES) config.maxCandidateArticles = parseInt(process.env.MAX_CANDIDATE_ARTICLES, 10);
 
   // Load from config file if exists

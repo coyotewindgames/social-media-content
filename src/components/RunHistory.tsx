@@ -30,6 +30,7 @@ import {
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
+import { RefineDialog } from '@/components/RefineDialog'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,8 +51,11 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Post card (compact) ────────────────────────────────────────────────────
 
-function PostCard({ post, imageSet }: { post: SocialPost; imageSet?: ImageSet }) {
+function PostCard({ post, imageSet, onRefine }: { post: SocialPost; imageSet?: ImageSet; onRefine?: (post: SocialPost) => void }) {
   const image = imageSet?.images?.[0]
+  const [showOriginal, setShowOriginal] = useState(false)
+  const displayContent = post.refinedContent && !showOriginal ? post.refinedContent : post.content
+
   return (
     <div className="border rounded-lg overflow-hidden bg-card">
       {image && image.url && !image.url.startsWith('data:') && (
@@ -67,7 +71,18 @@ function PostCard({ post, imageSet }: { post: SocialPost; imageSet?: ImageSet })
             </Badge>
           )}
         </div>
-        <p className="text-sm leading-relaxed whitespace-pre-wrap line-clamp-4">{post.content}</p>
+        {post.refinedContent && (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-violet-500/15 text-violet-600 border-violet-500/20 text-[10px]">✨ Refined</Badge>
+            <button
+              className="text-[10px] text-muted-foreground hover:text-foreground underline"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              {showOriginal ? 'Show refined' : 'Show original'}
+            </button>
+          </div>
+        )}
+        <p className="text-sm leading-relaxed whitespace-pre-wrap line-clamp-4">{displayContent}</p>
         {post.hashtags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {post.hashtags.map((tag) => (
@@ -84,6 +99,17 @@ function PostCard({ post, imageSet }: { post: SocialPost; imageSet?: ImageSet })
             <span className="flex items-center gap-1 truncate ml-auto"><LinkSimple size={12} />{post.newsSource}</span>
           )}
         </div>
+        {onRefine && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-1 gap-1.5 text-violet-600 border-violet-500/30 hover:bg-violet-500/10"
+            onClick={() => onRefine(post)}
+          >
+            <ArrowsClockwise size={14} weight="bold" />
+            {post.refinedContent ? 'Refine Again' : 'Refine with AI'}
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -95,6 +121,7 @@ function ExpandableRunRow({ run }: { run: RunSummary }) {
   const [expanded, setExpanded] = useState(false)
   const [result, setResult] = useState<PipelineResult | null>(null)
   const [loading, setLoading] = useState(false)
+  const [refineTarget, setRefineTarget] = useState<SocialPost | null>(null)
 
   const handleToggle = async () => {
     if (expanded) {
@@ -251,6 +278,7 @@ function ExpandableRunRow({ run }: { run: RunSummary }) {
                             key={post.postId}
                             post={post}
                             imageSet={result.imageSets.find((is) => is.postId === post.postId)}
+                            onRefine={(p) => setRefineTarget(p)}
                           />
                         ))}
                       </div>
@@ -260,6 +288,28 @@ function ExpandableRunRow({ run }: { run: RunSummary }) {
                   {result.posts.length === 0 && result.errors.length === 0 && (
                     <p className="text-sm text-muted-foreground text-center py-4">No posts were generated in this run.</p>
                   )}
+
+                  <RefineDialog
+                    post={refineTarget}
+                    pipelineId={run.id}
+                    open={!!refineTarget}
+                    onClose={() => setRefineTarget(null)}
+                    onRefined={(postId, refinedContent, notes) => {
+                      setRefineTarget(null)
+                      setResult((prev) => {
+                        if (!prev) return prev
+                        return {
+                          ...prev,
+                          posts: prev.posts.map((p) =>
+                            p.postId === postId
+                              ? { ...p, refinedContent, refinementNotes: notes }
+                              : p
+                          ),
+                        }
+                      })
+                      toast.success('Post refined successfully!')
+                    }}
+                  />
                 </>
               )}
             </div>

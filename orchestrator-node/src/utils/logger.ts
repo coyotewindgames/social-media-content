@@ -20,7 +20,7 @@ interface LoggerOptions {
   logDir?: string;
 }
 
-class Logger {
+export class Logger {
   private name: string;
   private level: number;
   private logDir?: string;

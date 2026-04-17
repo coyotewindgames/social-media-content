@@ -11,3 +11,4 @@ export {
   makeApiRequest,
   globalCache,
 } from './apiHelpers';
+export { refineContent, type RefinementResult } from './refinementService';

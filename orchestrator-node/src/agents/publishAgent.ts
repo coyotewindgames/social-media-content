@@ -134,7 +134,7 @@ export class PublishAgent extends BaseAgent {
     return retryWithBackoff(
       async () => {
         const tweetData: { text: string; media?: { media_ids: string[] } } = {
-          text: post.content,
+          text: post.refinedContent ?? post.content,
         };
 
         const url = 'https://api.twitter.com/2/tweets';
@@ -226,7 +226,7 @@ export class PublishAgent extends BaseAgent {
           lifecycleState: 'PUBLISHED',
           specificContent: {
             'com.linkedin.ugc.ShareContent': {
-              shareCommentary: { text: post.content },
+              shareCommentary: { text: post.refinedContent ?? post.content },
               shareMediaCategory: 'NONE',
             },
           },
@@ -313,7 +313,7 @@ export class PublishAgent extends BaseAgent {
       `https://graph.facebook.com/v18.0/${this.config.instagramBusinessId}/media`
     );
     containerUrl.searchParams.set('image_url', images.images[0].url);
-    containerUrl.searchParams.set('caption', post.content);
+    containerUrl.searchParams.set('caption', post.refinedContent ?? post.content);
     containerUrl.searchParams.set('access_token', this.config.instagramAccessToken);
 
     const containerResponse = await fetch(containerUrl.toString(), {
@@ -416,7 +416,7 @@ export class PublishAgent extends BaseAgent {
     const carouselUrl = new URL(`https://graph.facebook.com/v18.0/${businessId}/media`);
     carouselUrl.searchParams.set('media_type', 'CAROUSEL');
     carouselUrl.searchParams.set('children', childContainerIds.join(','));
-    carouselUrl.searchParams.set('caption', post.content);
+    carouselUrl.searchParams.set('caption', post.refinedContent ?? post.content);
     carouselUrl.searchParams.set('access_token', accessToken);
 
     const carouselResponse = await fetch(carouselUrl.toString(), {
@@ -494,7 +494,7 @@ export class PublishAgent extends BaseAgent {
     }
 
     const formData = new URLSearchParams();
-    formData.append('message', post.content);
+    formData.append('message', post.refinedContent ?? post.content);
     formData.append('access_token', this.config.facebookAccessToken);
 
     if (images && images.images.length > 0) {
@@ -546,7 +546,7 @@ export class PublishAgent extends BaseAgent {
 
   private simulatePublish(post: SocialPost, images?: ImageSet): PublishResult {
     this.logger.info(`[DRY RUN] Would publish to ${post.platform}:`);
-    this.logger.info(`  Content: ${post.content.slice(0, 100)}...`);
+    this.logger.info(`  Content: ${(post.refinedContent ?? post.content).slice(0, 100)}...`);
     if (images && images.images.length > 0) {
       this.logger.info(`  Images: ${images.images.length}`);
     }

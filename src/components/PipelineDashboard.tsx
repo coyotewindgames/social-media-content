@@ -8,6 +8,7 @@ import {
   listPipelineRuns,
   getActivePersona,
   publishToInstagram,
+  refinePostContent,
   type ConfigStatus,
   type RunSummary,
   type PipelineResult,
@@ -19,6 +20,7 @@ import {
   type PartialResults,
 } from '@/lib/orchestrator-api'
 import { PersonaSettingsDialog } from '@/components/PersonaSettingsDialog'
+import { RefineDialog } from '@/components/RefineDialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -195,16 +197,22 @@ function ContentPostCard({
   imageSet,
   runLabel,
   compact,
+  onRefine,
+  pipelineId,
 }: {
   post: SocialPost
   imageSet?: ImageSet
   runLabel?: string
   compact?: boolean
+  onRefine?: (post: SocialPost) => void
+  pipelineId?: string
 }) {
   const slides = post.carouselSlides
   const hasCarousel = slides && slides.length > 0 && imageSet && imageSet.images.length > 1
   const image = imageSet?.images?.[0]
   const [publishing, setPublishing] = useState(false)
+  const [showOriginal, setShowOriginal] = useState(false)
+  const displayContent = post.refinedContent && !showOriginal ? post.refinedContent : post.content
 
   return (
     <motion.div
@@ -276,7 +284,18 @@ function ContentPostCard({
         </div>
 
         {/* Body */}
-        <p className={`leading-relaxed whitespace-pre-wrap ${compact ? 'text-xs line-clamp-4' : 'text-sm'}`}>{post.content}</p>
+        {post.refinedContent && !compact && (
+          <div className="flex items-center gap-2">
+            <Badge className="bg-violet-500/15 text-violet-600 border-violet-500/20 text-[10px]">✨ Refined</Badge>
+            <button
+              className="text-[10px] text-muted-foreground hover:text-foreground underline"
+              onClick={() => setShowOriginal(!showOriginal)}
+            >
+              {showOriginal ? 'Show refined' : 'Show original'}
+            </button>
+          </div>
+        )}
+        <p className={`leading-relaxed whitespace-pre-wrap ${compact ? 'text-xs line-clamp-4' : 'text-sm'}`}>{displayContent}</p>
 
         {/* Hashtags */}
         {post.hashtags.length > 0 && (
@@ -305,6 +324,19 @@ function ContentPostCard({
           )}
         </div>
 
+        {/* Refine with AI */}
+        {onRefine && !compact && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-2 gap-1.5 text-violet-600 border-violet-500/30 hover:bg-violet-500/10"
+            onClick={() => onRefine(post)}
+          >
+            <ArrowsClockwise size={14} weight="bold" />
+            {post.refinedContent ? 'Refine Again' : 'Refine with AI'}
+          </Button>
+        )}
+
         {/* Publish to Instagram */}
         {image?.url && !image.url.startsWith('data:') && (
           <Button
@@ -315,7 +347,7 @@ function ContentPostCard({
             onClick={async () => {
               setPublishing(true)
               try {
-                const caption = `${post.content}\n\n${post.hashtags.map(t => `#${t}`).join(' ')}`
+                const caption = `${displayContent}\n\n${post.hashtags.map(t => `#${t}`).join(' ')}`
                 const res = await publishToInstagram(caption, image.url)
                 toast.success(`Published to Instagram! Media ID: ${res.mediaId}`)
               } catch (err) {
@@ -466,11 +498,15 @@ function RunDetailView({
   result,
   runId,
   onClose,
+  onPostRefined,
 }: {
   result: PipelineResult
   runId: string
   onClose: () => void
+  onPostRefined?: (postId: string, refinedContent: string, notes: string) => void
 }) {
+  const [refineTarget, setRefineTarget] = useState<SocialPost | null>(null)
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -515,10 +551,23 @@ function RunDetailView({
               key={post.postId}
               post={post}
               imageSet={result.imageSets.find((is) => is.postId === post.postId)}
+              pipelineId={runId}
+              onRefine={(p) => setRefineTarget(p)}
             />
           ))}
         </AnimatePresence>
       </div>
+
+      <RefineDialog
+        post={refineTarget}
+        pipelineId={runId}
+        open={!!refineTarget}
+        onClose={() => setRefineTarget(null)}
+        onRefined={(postId, refinedContent, notes) => {
+          setRefineTarget(null)
+          onPostRefined?.(postId, refinedContent, notes)
+        }}
+      />
     </div>
   )
 }
@@ -894,6 +943,7 @@ export function PipelineDashboard() {
                   <AgentStep label="Fetching News" icon={Newspaper} status={agentStatus('news_agent')} detail={newsDetail} />
                   <AgentStep label="Ranking Articles" icon={Scales} status={agentStatus('ranking_agent')} detail={rankingDetail} />
                   <AgentStep label="Generating Content" icon={Lightning} status={agentStatus('content_agent')} detail={contentDetail} />
+                  <AgentStep label="Refining Content" icon={ArrowsClockwise} status={agentStatus('refinement_agent')} />
                   <AgentStep label="Creating Images" icon={ImageSquare} status={agentStatus('image_agent')} detail={imageDetail} />
                   <AgentStep label="Publishing" icon={PaperPlaneTilt} status={agentStatus('publish_agent')} detail={publishDetail} isLast />
                 </div>
@@ -989,6 +1039,19 @@ export function PipelineDashboard() {
           result={previewResult}
           runId={previewRunId}
           onClose={() => { setPreviewRunId(null); setPreviewResult(null) }}
+          onPostRefined={(postId, refinedContent, notes) => {
+            setPreviewResult((prev) => {
+              if (!prev) return prev
+              return {
+                ...prev,
+                posts: prev.posts.map((p) =>
+                  p.postId === postId
+                    ? { ...p, refinedContent, refinementNotes: notes }
+                    : p
+                ),
+              }
+            })
+          }}
         />
       )}
 
