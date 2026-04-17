@@ -382,49 +382,64 @@ app.get('/api/persona', (_req, res) => {
 import { refineContent } from './utils/refinementService';
 
 app.post('/api/refine', async (req, res) => {
-  const { pipelineId, postId, refinementPrompt } = req.body as {
+  const { pipelineId, postId, refinementPrompt, content: directContent, platform: directPlatform } = req.body as {
     pipelineId?: string;
     postId?: string;
     refinementPrompt?: string;
+    content?: string;
+    platform?: string;
   };
 
-  if (!pipelineId || !postId || !refinementPrompt) {
-    res.status(400).json({ error: 'pipelineId, postId, and refinementPrompt are all required' });
-    return;
-  }
-
-  if (!supabase) {
-    res.status(503).json({ error: 'Supabase is not configured' });
+  if (!refinementPrompt) {
+    res.status(400).json({ error: 'refinementPrompt is required' });
     return;
   }
 
   try {
-    // 1. Load the pipeline run
-    const { data: run, error: fetchErr } = await supabase
-      .from('pipeline_runs')
-      .select('posts')
-      .eq('id', pipelineId)
-      .single();
+    let contentToRefine: string | undefined;
+    let platform: Platform = Platform.TWITTER;
+    let canUpdateSupabase = false;
+    let posts: Array<Record<string, unknown>> = [];
+    let postIndex = -1;
 
-    if (fetchErr || !run) {
-      res.status(404).json({ error: `Pipeline run ${pipelineId} not found` });
+    // Try loading from Supabase pipeline_runs first
+    if (supabase && pipelineId && postId) {
+      const { data: run, error: fetchErr } = await supabase
+        .from('pipeline_runs')
+        .select('posts')
+        .eq('id', pipelineId)
+        .single();
+
+      if (!fetchErr && run) {
+        posts = (run.posts ?? []) as Array<Record<string, unknown>>;
+        postIndex = posts.findIndex((p) => p.postId === postId);
+
+        if (postIndex !== -1) {
+          const post = posts[postIndex];
+          contentToRefine = (post.refinedContent as string) || (post.content as string);
+          platform = (post.platform as Platform) || Platform.TWITTER;
+          canUpdateSupabase = true;
+        }
+      }
+    }
+
+    // Fall back to directly-provided content
+    if (!contentToRefine && directContent) {
+      contentToRefine = directContent;
+      const validPlatforms = Object.values(Platform) as string[];
+      if (directPlatform && validPlatforms.includes(directPlatform)) {
+        platform = directPlatform as Platform;
+      }
+    }
+
+    if (!contentToRefine) {
+      res.status(400).json({ error: 'No content to refine. Provide a valid pipelineId/postId or include content directly.' });
       return;
     }
 
-    const posts = (run.posts ?? []) as Array<Record<string, unknown>>;
-    const postIndex = posts.findIndex((p) => p.postId === postId);
-
-    if (postIndex === -1) {
-      res.status(404).json({ error: `Post ${postId} not found in pipeline ${pipelineId}` });
-      return;
-    }
-
-    const post = posts[postIndex];
-    const contentToRefine = (post.refinedContent as string) || (post.content as string);
-    const platform = (post.platform as Platform) || Platform.TWITTER;
     const persona = orchestrator.getActivePersona();
 
-    // 2. Call GPT-5.3
+    // Call the LLM
     const result = await refineContent(
       contentToRefine,
       refinementPrompt,
@@ -433,26 +448,26 @@ app.post('/api/refine', async (req, res) => {
       config,
     );
 
-    // 3. Update the post in the JSONB array
-    posts[postIndex] = {
-      ...post,
-      refinedContent: result.refinedContent,
-      refinementNotes: result.notes,
-      refinementPrompt,
-    };
+    // Update Supabase if we loaded from there
+    if (canUpdateSupabase && supabase && postIndex !== -1) {
+      posts[postIndex] = {
+        ...posts[postIndex],
+        refinedContent: result.refinedContent,
+        refinementNotes: result.notes,
+        refinementPrompt,
+      };
 
-    const { error: updateErr } = await supabase
-      .from('pipeline_runs')
-      .update({ posts })
-      .eq('id', pipelineId);
+      const { error: updateErr } = await supabase
+        .from('pipeline_runs')
+        .update({ posts })
+        .eq('id', pipelineId);
 
-    if (updateErr) {
-      logger.error(`Supabase update failed: ${updateErr.message}`);
-      res.status(500).json({ error: updateErr.message });
-      return;
+      if (updateErr) {
+        logger.warn(`Supabase update failed (result still returned): ${updateErr.message}`);
+      }
     }
 
-    logger.info(`Refined post ${postId} in pipeline ${pipelineId}`);
+    logger.info(`Refined content${pipelineId ? ` (pipeline ${pipelineId})` : ' (direct)'}`);
     res.json({
       success: true,
       refinedContent: result.refinedContent,

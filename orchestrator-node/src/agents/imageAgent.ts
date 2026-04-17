@@ -290,13 +290,15 @@ export class ImageAgent extends BaseAgent {
   }
 
   private enhancePrompt(prompt: string): string {
-    const enhancements = ['high quality', 'professional', 'detailed', 'vibrant colors'];
-
-    if (enhancements.some((e) => prompt.toLowerCase().includes(e))) {
-      return prompt;
-    }
-
-    return `${prompt}, ${enhancements.join(', ')}`;
+    // Strip any text/quote/headline instructions that leaked into the prompt
+    const cleaned = prompt
+      .replace(/[""\u201C\u201D].{5,}?[""\u201C\u201D]/g, '')
+      .replace(/with (?:the )?(?:text|words|headline|title|caption|slogan|quote|phrase|overlay).*/gi, '')
+      .replace(/(?:text|headline|title|caption|slogan|typography|words|letters)\s*(?:overlay|reading|saying|that says).*/gi, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    const base = cleaned.includes('high quality') ? cleaned : `${cleaned}, high quality, professional, detailed, vibrant colors`;
+    return `${base}. Photorealistic or cinematic illustration. Absolutely NO text, NO words, NO letters, NO numbers, NO typography, NO headlines, NO captions, NO watermarks anywhere in the image. The image must contain ZERO readable characters of any kind. Pure visual imagery only.`;
   }
 
   private getUnsplashImage(dimensions: ImageDimensions, index = 0): GeneratedImage {

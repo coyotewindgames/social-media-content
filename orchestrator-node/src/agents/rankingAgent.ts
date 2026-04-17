@@ -220,7 +220,7 @@ Return exactly ${topN} articles, sorted by score descending. Use the article ind
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-4o-mini',
+            model: 'gpt-5-mini',
             messages: [
               {
                 role: 'system',

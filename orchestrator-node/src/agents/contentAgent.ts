@@ -111,7 +111,8 @@ ${persona.examplePosts.map((p, i) => `${i + 1}. "${p}"`).join('\n')}
 - Follow the persona's emoji, hashtag, and CTA patterns exactly
 - NEVER produce actual slurs, doxxing, direct harassment, or calls to violence
 - Provocative and confrontational is ENCOURAGED — hateful and threatening is NOT
-- Generate an image prompt for DALL-E that fits the post's combative, attention-grabbing brand`;
+- Generate an image prompt that describes ONLY a visual scene — dramatic, cinematic, bold imagery
+- IMAGE PROMPT RULES: Describe the visual scene ONLY (subjects, setting, lighting, mood, colors, composition). The image prompt must NEVER include any text, words, phrases, quotes, headlines, slogans, or typography to render on the image. NO text overlay whatsoever. The image should be a powerful photograph or illustration that captures the emotion and topic visually.`;
   }
 
   // ─── Instagram Carousel prompt construction ───────────────────────────────────────
@@ -207,12 +208,12 @@ Respond in JSON format:
         {
             "content": "Full carousel caption with hashtags (this goes in the Instagram caption field — Allen's voice, not a summary)",
             "hashtags": ["hashtag1", "hashtag2"],
-            "image_prompt": "Overall visual theme prompt for the carousel cover image",
+            "image_prompt": "Visual-only scene description — dramatic imagery, NO text/words/letters in the image",
             "call_to_action": "The CTA or feedback ask from slide 3",
             "carousel_slides": [
-                { "slide_number": 1, "text": "Strong, varied hook in Allen's edgy sarcastic voice", "image_prompt": "Brief description of the visual concept for slide 1" },
-                { "slide_number": 2, "text": "Analysis or context with Allen's dry humor", "image_prompt": "Brief description of the visual concept for slide 2" },
-                { "slide_number": 3, "text": "Sharp insight with call-to-action or feedback request", "image_prompt": "Brief description of the visual concept for slide 3" }
+                { "slide_number": 1, "text": "Strong, varied hook in Allen's edgy sarcastic voice", "image_prompt": "Visual-only scene — describe subjects, setting, mood, lighting. NO text or words in the image" },
+                { "slide_number": 2, "text": "Analysis or context with Allen's dry humor", "image_prompt": "Visual-only scene — describe subjects, setting, mood, lighting. NO text or words in the image" },
+                { "slide_number": 3, "text": "Sharp insight with call-to-action or feedback request", "image_prompt": "Visual-only scene — describe subjects, setting, mood, lighting. NO text or words in the image" }
             ]
         }
     ]
@@ -259,7 +260,7 @@ Respond in JSON format:
         {
             "content": "The post text with hashtags",
             "hashtags": ["hashtag1", "hashtag2"],
-            "image_prompt": "DALL-E prompt for generating an image",
+            "image_prompt": "Visual-only scene description — dramatic imagery, NO text/words/letters rendered in the image",
             "call_to_action": "Optional CTA text"
         }
     ]
@@ -348,7 +349,7 @@ Rules:
 - Make content platform-appropriate
 - Each post must have a unique angle — never repeat a topic or style already used
 
-For each post, also provide an image prompt that could be used with DALL-E to generate a relevant image.`;
+For each post, also provide an image prompt that describes ONLY the visual scene (subjects, setting, lighting, mood, colors). The image prompt must NOT include any text, words, headlines, or typography to be rendered on the image. Describe a powerful visual that captures the topic's emotion.`;
 
       userPrompt = `Create ${count} unique ${platform} post(s) about this news:
 
@@ -362,7 +363,7 @@ Respond in JSON format:
         {
             "content": "The post text with hashtags",
             "hashtags": ["hashtag1", "hashtag2"],
-            "image_prompt": "DALL-E prompt for generating an image",
+            "image_prompt": "Visual-only scene — describe subjects, setting, mood, lighting, colors. Absolutely NO text/words/letters in the image",
             "call_to_action": "Optional CTA text"
         }
     ]
@@ -378,7 +379,7 @@ Respond in JSON format:
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            model: 'gpt-5.4-mini',
+            model: 'gpt-5.1',
             messages: [
               { role: 'system', content: systemPrompt },
               { role: 'user', content: userPrompt },
@@ -398,7 +399,7 @@ Respond in JSON format:
           choices?: Array<{ message?: { content?: string } }>;
         };
         const content = data.choices?.[0]?.message?.content ?? '{}';
-        return this.parsePostsResponse(content, platform, tone, newsItem, 'gpt-5.4-mini', limits.maxChars, persona);
+        return this.parsePostsResponse(content, platform, tone, newsItem, 'gpt-5.1', limits.maxChars, persona);
       },
       { maxRetries: 3, baseDelayMs: 2000 }
     );
@@ -455,7 +456,7 @@ Respond in JSON format:
         {
             "content": "The post text with hashtags",
             "hashtags": ["hashtag1", "hashtag2"],
-            "image_prompt": "DALL-E prompt for generating an image",
+            "image_prompt": "Visual-only scene — describe subjects, setting, mood, lighting, colors. Absolutely NO text/words/letters in the image",
             "call_to_action": "Optional CTA text"
         }
     ]
@@ -551,7 +552,7 @@ Respond ONLY with valid JSON, no other text:
         {
             "content": "The post text with hashtags",
             "hashtags": ["hashtag1", "hashtag2"],
-            "image_prompt": "DALL-E prompt for generating an image",
+            "image_prompt": "Visual-only scene — describe subjects, setting, mood, lighting, colors. Absolutely NO text/words/letters in the image",
             "call_to_action": "Optional CTA text"
         }
     ]

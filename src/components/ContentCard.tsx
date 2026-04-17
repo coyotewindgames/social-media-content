@@ -2,7 +2,7 @@ import { ContentIdea, Platform } from '@/lib/types'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { PencilSimple, Trash, Copy, PaperPlaneTilt, InstagramLogo } from '@phosphor-icons/react'
+import { PencilSimple, Trash, Copy, PaperPlaneTilt, InstagramLogo, ArrowsClockwise } from '@phosphor-icons/react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
 
@@ -12,6 +12,7 @@ interface ContentCardProps {
   onDelete: (id: string) => void
   onPublish?: (content: ContentIdea) => void
   onInstagramUpload?: (content: ContentIdea) => void
+  onRefine?: (content: ContentIdea) => void
 }
 
 const platformColors: Record<Platform, string> = {
@@ -22,7 +23,7 @@ const platformColors: Record<Platform, string> = {
   youtube: 'bg-red-600 text-white',
 }
 
-export function ContentCard({ content, onEdit, onDelete, onPublish, onInstagramUpload }: ContentCardProps) {
+export function ContentCard({ content, onEdit, onDelete, onPublish, onInstagramUpload, onRefine }: ContentCardProps) {
   const handleCopyCaption = () => {
     navigator.clipboard.writeText(content.caption)
     toast.success('Caption copied to clipboard!')
@@ -70,6 +71,20 @@ export function ContentCard({ content, onEdit, onDelete, onPublish, onInstagramU
               </div>
             </div>
             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onRefine && content.status !== 'published' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-violet-500"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onRefine(content)
+                  }}
+                  title="Refine with AI"
+                >
+                  <ArrowsClockwise size={16} weight="bold" />
+                </Button>
+              )}
               {onPublish && content.status !== 'published' && (
                 <Button
                   variant="ghost"

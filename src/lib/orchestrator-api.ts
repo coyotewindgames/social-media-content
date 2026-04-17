@@ -247,9 +247,11 @@ export async function refinePostContent(
   pipelineId: string,
   postId: string,
   refinementPrompt: string,
+  content?: string,
+  platform?: string,
 ): Promise<{ success: boolean; refinedContent: string; notes: string }> {
   return apiFetch<{ success: boolean; refinedContent: string; notes: string }>('/refine', {
     method: 'POST',
-    body: JSON.stringify({ pipelineId, postId, refinementPrompt }),
+    body: JSON.stringify({ pipelineId, postId, refinementPrompt, content, platform }),
   })
 }

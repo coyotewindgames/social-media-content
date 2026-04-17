@@ -32,6 +32,7 @@ const PRESET_PROMPTS = [
   { label: 'Add CTA', prompt: 'Add or strengthen the call-to-action to drive more engagement and comments.' },
   { label: 'Improve Flow', prompt: 'Improve the logical flow and readability. Make transitions smoother.' },
   { label: 'More Provocative', prompt: 'Dial up the intensity and provocation. Make it impossible to ignore.' },
+  { label: 'Unhinged Rant', prompt: 'Rewrite this as an unhinged, confrontational rant that treats the product/deal like a grand conspiracy against the American consumer. Open by dismissing the product as absurd, then pivot to outrage about WHY it exists. Frame discounts and email signups as manipulative psyops — the system extracting data from you while making you feel clever. Use short, punchy sentence fragments for emphasis like "A chair. A CHAIR." Escalate mundane retail details (free shipping, coupon codes, email lists) into existential commentary about consumer culture. Drip with sarcasm — stack words like "Great. Wonderful. Amazing." to mock the deal. Break the fourth wall — talk directly to "America" or the audience, tell them to "wake up." End with a call to awareness, not a call to action — the punchline is that even a simple purchase has strings attached. Keep hashtags sharp and ironic, 2-3 max. Tone: 80% theatrical outrage, 20% genuine insight buried under the chaos. Never sound like you\'re selling — sound like you\'re exposing.' },
 ]
 
 interface RefineDialogProps {
@@ -76,7 +77,13 @@ export function RefineDialog({
     setError(null)
 
     try {
-      const res = await refinePostContent(pipelineId, post.postId, refinementPrompt.trim())
+      const res = await refinePostContent(
+        pipelineId,
+        post.postId,
+        refinementPrompt.trim(),
+        currentContent,
+        post.platform,
+      )
       setResult({ refinedContent: res.refinedContent, notes: res.notes })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
