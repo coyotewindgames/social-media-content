@@ -216,6 +216,8 @@ function ContentPostCard({
   const [publishingX, setPublishingX] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const displayContent = post.refinedContent && !showOriginal ? post.refinedContent : post.content
+  const twitterText = `${displayContent}${post.hashtags.length > 0 ? `\n\n${post.hashtags.map((t) => `#${t}`).join(' ')}` : ''}`
+  const twitterTextTooLong = twitterText.length > 280
 
   return (
     <motion.div
@@ -370,33 +372,32 @@ function ContentPostCard({
         )}
 
         {/* Publish to X */}
-        {post.platform === 'twitter' && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="w-full mt-2 gap-1.5 text-sky-600 border-sky-500/30 hover:bg-sky-500/10"
-            disabled={publishingX}
-            onClick={async () => {
-              setPublishingX(true)
-              try {
-                const hashtags = post.hashtags.length > 0 ? `\n\n${post.hashtags.map((t) => `#${t}`).join(' ')}` : ''
-                const text = `${displayContent}${hashtags}`
-                const res = await publishToTwitter(text)
-                toast.success(`Posted to X! Tweet ID: ${res.tweetId}`)
-              } catch (err) {
-                toast.error(`Publish to X failed: ${err instanceof Error ? err.message : String(err)}`)
-              } finally {
-                setPublishingX(false)
-              }
-            }}
-          >
-            {publishingX ? (
-              <CircleNotch size={14} className="animate-spin" />
-            ) : (
-              <Bird size={14} weight="bold" />
-            )}
-            {publishingX ? 'Posting to X…' : 'Post to X'}
-          </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="w-full mt-2 gap-1.5 text-sky-600 border-sky-500/30 hover:bg-sky-500/10"
+          disabled={publishingX || twitterTextTooLong}
+          onClick={async () => {
+            setPublishingX(true)
+            try {
+              const res = await publishToTwitter(twitterText)
+              toast.success(`Posted to X! Tweet ID: ${res.tweetId}`)
+            } catch (err) {
+              toast.error(`Publish to X failed: ${err instanceof Error ? err.message : String(err)}`)
+            } finally {
+              setPublishingX(false)
+            }
+          }}
+        >
+          {publishingX ? (
+            <CircleNotch size={14} className="animate-spin" />
+          ) : (
+            <Bird size={14} weight="bold" />
+          )}
+          {publishingX ? 'Posting to X…' : 'Post to X'}
+        </Button>
+        {twitterTextTooLong && (
+          <p className="text-xs text-amber-600 mt-1">Too long for X ({twitterText.length}/280). Shorten before posting.</p>
         )}
       </div>
     </motion.div>
