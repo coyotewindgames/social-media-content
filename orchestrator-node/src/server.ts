@@ -8,6 +8,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import * as crypto from 'crypto';
 import * as dotenv from 'dotenv';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { Orchestrator, RunOptions, PipelineResult } from './orchestrator';
@@ -114,7 +115,12 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/config/status', (_req, res) => {
   const hasOpenAI = !!config.openaiApiKey;
   const hasAnthropic = !!config.anthropicApiKey;
-  const hasTwitter = !!config.twitterAccessToken;
+  const hasTwitter = !!(
+    config.twitterAccessToken &&
+    config.twitterAccessSecret &&
+    config.twitterApiKey &&
+    config.twitterApiSecret
+  );
   const hasInstagram = !!config.instagramAccessToken;
   const hasLinkedIn = !!config.linkedinAccessToken;
   const hasFacebook = !!config.facebookAccessToken;
@@ -475,6 +481,112 @@ app.post('/api/refine', async (req, res) => {
     });
   } catch (err) {
     logger.error(`/api/refine error: ${err}`);
+    res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+function percentEncode(str: string): string {
+  return encodeURIComponent(str).replace(/[!'()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function buildTwitterOAuth1Header(method: string, url: string): string {
+  const consumerKey = config.twitterApiKey!;
+  const consumerSecret = config.twitterApiSecret!;
+  const accessToken = config.twitterAccessToken!;
+  const accessSecret = config.twitterAccessSecret!;
+
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: consumerKey,
+    oauth_nonce: crypto.randomBytes(16).toString('hex'),
+    oauth_signature_method: 'HMAC-SHA1',
+    oauth_timestamp: Math.floor(Date.now() / 1000).toString(),
+    oauth_token: accessToken,
+    oauth_version: '1.0',
+  };
+
+  const paramString = Object.keys(oauthParams)
+    .sort()
+    .map((k) => `${percentEncode(k)}=${percentEncode(oauthParams[k])}`)
+    .join('&');
+
+  const baseString = [
+    method.toUpperCase(),
+    percentEncode(url),
+    percentEncode(paramString),
+  ].join('&');
+
+  const signingKey = `${percentEncode(consumerSecret)}&${percentEncode(accessSecret)}`;
+  const signature = crypto
+    .createHmac('sha1', signingKey)
+    .update(baseString)
+    .digest('base64');
+
+  oauthParams.oauth_signature = signature;
+
+  const header = Object.keys(oauthParams)
+    .sort()
+    .map((k) => `${percentEncode(k)}="${percentEncode(oauthParams[k])}"`)
+    .join(', ');
+
+  return `OAuth ${header}`;
+}
+
+// ─── Publish a single post to X (Twitter) on demand ────────────────────────
+// Accepts { text } and uses TWITTER_ACCESS_TOKEN / TWITTER_ACCESS_SECRET /
+// TWITTER_API_KEY / TWITTER_API_SECRET to publish via Twitter API v2.
+
+app.post('/api/publish/twitter', async (req, res) => {
+  const { text } = req.body as { text?: string };
+
+  if (!text || !text.trim()) {
+    res.status(400).json({ error: 'text is required' });
+    return;
+  }
+
+  if (text.length > 280) {
+    res.status(400).json({ error: 'text exceeds X character limit (280)' });
+    return;
+  }
+
+  if (!config.twitterAccessToken || !config.twitterAccessSecret || !config.twitterApiKey || !config.twitterApiSecret) {
+    res.status(503).json({
+      error: 'Twitter credentials not fully configured (TWITTER_ACCESS_TOKEN / TWITTER_ACCESS_SECRET / TWITTER_API_KEY / TWITTER_API_SECRET)',
+    });
+    return;
+  }
+
+  try {
+    const url = 'https://api.twitter.com/2/tweets';
+    const authHeader = buildTwitterOAuth1Header('POST', url);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text: text.trim() }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      logger.error(`Twitter publish failed: ${response.status} ${errText}`);
+      res.status(502).json({ error: `Twitter API error: ${response.status} - ${errText}` });
+      return;
+    }
+
+    const data = (await response.json()) as { data?: { id?: string; text?: string } };
+    const tweetId = data.data?.id ?? '';
+
+    logger.info(`Published to X: tweetId=${tweetId}`);
+    res.json({
+      success: true,
+      tweetId,
+      postUrl: `https://x.com/i/web/status/${tweetId}`,
+    });
+  } catch (err) {
+    logger.error(`/api/publish/twitter error: ${err}`);
     res.status(500).json({ error: err instanceof Error ? err.message : String(err) });
   }
 });

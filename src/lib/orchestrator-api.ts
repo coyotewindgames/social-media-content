@@ -241,6 +241,13 @@ export async function publishToInstagram(caption: string, imageUrl: string): Pro
   })
 }
 
+export async function publishToTwitter(text: string): Promise<{ success: boolean; tweetId: string; postUrl: string }> {
+  return apiFetch<{ success: boolean; tweetId: string; postUrl: string }>('/publish/twitter', {
+    method: 'POST',
+    body: JSON.stringify({ text }),
+  })
+}
+
 // ─── Content refinement (GPT-5.3) ───────────────────────────────────────────
 
 export async function refinePostContent(

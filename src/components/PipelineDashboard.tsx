@@ -8,6 +8,7 @@ import {
   listPipelineRuns,
   getActivePersona,
   publishToInstagram,
+  publishToTwitter,
   refinePostContent,
   type ConfigStatus,
   type RunSummary,
@@ -63,6 +64,7 @@ import {
   Gear,
   InstagramLogo,
   Upload,
+  Bird,
 } from '@phosphor-icons/react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
@@ -211,6 +213,7 @@ function ContentPostCard({
   const hasCarousel = slides && slides.length > 0 && imageSet && imageSet.images.length > 1
   const image = imageSet?.images?.[0]
   const [publishing, setPublishing] = useState(false)
+  const [publishingX, setPublishingX] = useState(false)
   const [showOriginal, setShowOriginal] = useState(false)
   const displayContent = post.refinedContent && !showOriginal ? post.refinedContent : post.content
 
@@ -363,6 +366,36 @@ function ContentPostCard({
               <InstagramLogo size={14} weight="bold" />
             )}
             {publishing ? 'Publishing…' : 'Publish to Instagram'}
+          </Button>
+        )}
+
+        {/* Publish to X */}
+        {post.platform === 'twitter' && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full mt-2 gap-1.5 text-sky-600 border-sky-500/30 hover:bg-sky-500/10"
+            disabled={publishingX}
+            onClick={async () => {
+              setPublishingX(true)
+              try {
+                const hashtags = post.hashtags.length > 0 ? `\n\n${post.hashtags.map((t) => `#${t}`).join(' ')}` : ''
+                const text = `${displayContent}${hashtags}`
+                const res = await publishToTwitter(text)
+                toast.success(`Posted to X! Tweet ID: ${res.tweetId}`)
+              } catch (err) {
+                toast.error(`Publish to X failed: ${err instanceof Error ? err.message : String(err)}`)
+              } finally {
+                setPublishingX(false)
+              }
+            }}
+          >
+            {publishingX ? (
+              <CircleNotch size={14} className="animate-spin" />
+            ) : (
+              <Bird size={14} weight="bold" />
+            )}
+            {publishingX ? 'Posting to X…' : 'Post to X'}
           </Button>
         )}
       </div>
